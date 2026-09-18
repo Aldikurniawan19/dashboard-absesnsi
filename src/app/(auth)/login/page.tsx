@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { baseURL } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,9 +75,12 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger-light p-3 text-xs text-danger">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>{error}</p>
+                <div className="flex flex-col gap-1 rounded-lg border border-danger/30 bg-danger-light p-3 text-xs text-danger">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <p className="font-medium">{error}</p>
+                  </div>
+                  <p className="text-[11px] text-danger/80 pl-6">Target Server: {baseURL}</p>
                 </div>
               )}
 
