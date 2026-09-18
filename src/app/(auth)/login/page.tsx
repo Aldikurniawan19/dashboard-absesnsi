@@ -27,9 +27,10 @@ export default function LoginPage() {
     try {
       await login(identifier, password);
     } catch (err: any) {
+      console.error('Login error:', err);
       const msg =
         err.response?.data?.message ||
-        'Kredensial login tidak cocok atau server tidak dapat dihubungi';
+        (err.message ? `Gagal terhubung: ${err.message}` : 'Kredensial login tidak cocok atau server tidak dapat dihubungi');
       setError(msg);
     } finally {
       setIsLoading(false);
