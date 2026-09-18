@@ -1,0 +1,43 @@
+# ==========================================
+# Web (Next.js Frontend) .gitignore
+# ==========================================
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Next.js Build & Static Outputs
+/.next/
+/out/
+/build/
+/dist/
+
+# Vercel Deployment Metadata
+.vercel
+
+# Environment & Local Configuration Files
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# TypeScript Build Info Cache
+*.tsbuildinfo
+next-env.d.ts
+
+# Debug Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing & Coverage
+/coverage
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+*.pem
