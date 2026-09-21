@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/toast';
 import { formatTanggal } from '@/lib/utils';
 import { TahunAjaran } from '@/types/api';
 import { CheckCircle2, Clock, Plus, Power, Trash2 } from 'lucide-react';
@@ -49,9 +50,11 @@ export default function AdminTahunAjaranPage() {
       setNama('');
       setTanggalMulai('');
       setTanggalSelesai('');
-      setSuccessMessage('Tahun ajaran baru berhasil ditambahkan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Tahun ajaran baru berhasil ditambahkan');
       refetch();
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menambahkan tahun ajaran', err?.response?.data?.message || 'Periksa kembali data');
     },
   });
 
@@ -62,9 +65,11 @@ export default function AdminTahunAjaranPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tahun-ajaran-list'] });
-      setSuccessMessage('Tahun ajaran berhasil diaktifkan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Tahun ajaran berhasil diaktifkan');
       refetch();
+    },
+    onError: (err: any) => {
+      toast.error('Gagal mengaktifkan tahun ajaran', err?.response?.data?.message || 'Terjadi kesalahan sistem');
     },
   });
 
@@ -74,7 +79,11 @@ export default function AdminTahunAjaranPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tahun-ajaran-list'] });
+      toast.success('Tahun ajaran berhasil dihapus');
       refetch();
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menghapus tahun ajaran', err?.response?.data?.message || 'Tahun ajaran sedang digunakan');
     },
   });
 

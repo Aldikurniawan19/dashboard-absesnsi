@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/toast';
 import { AbsensiStatus, JadwalPelajaran } from '@/types/api';
 import { Check, CheckCircle2, UserCheck } from 'lucide-react';
 
@@ -63,8 +64,10 @@ export default function AbsensiManualPage() {
     },
     onSuccess: () => {
       refetchSesi();
-      setSuccessMessage('Perubahan status absensi berhasil disimpan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Status kehadiran siswa berhasil diperbarui');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal mencatat absensi manual', err?.response?.data?.message || 'Terjadi kesalahan sistem');
     },
   });
 

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Kelas, TahunAjaran } from '@/types/api';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/toast';
 import {
   AlertCircle,
   ArrowLeft,
@@ -100,16 +101,17 @@ export default function BuatJadwalOtomatisPage() {
 
       const res = await api.post('/jadwal/generate/sma-preview', {
         tahun_ajaran_id: selectedTahunId,
+        tingkat_list: selectedTingkat,
         kelas_ids: targetIds,
-        durasi_jp: Number(durasiJp),
         jam_mulai: jamMulai,
+        durasi_jp: Number(durasiJp),
         replace_existing: replaceExisting,
       });
       return res.data?.data ?? res.data;
     },
     onSuccess: (data) => {
       setPreviewResult(data);
-      if (data?.target_kelas_ids?.length > 0) {
+      if (data?.target_kelas_ids && data.target_kelas_ids.length > 0) {
         setPreviewKelasId(data.target_kelas_ids[0]);
       }
       setStep(3);
@@ -117,24 +119,24 @@ export default function BuatJadwalOtomatisPage() {
     onError: (err: any) => {
       const msg =
         err.response?.data?.message ||
-        'Gagal melakukan simulasi penjadwalan otomatis SMA.';
+        'Terjadi kesalahan saat melakukan simulasi jadwal.';
       setErrorMessage(msg);
+      toast.error('Simulasi jadwal gagal', msg);
     },
   });
 
-  // Mutasi 2: Terapkan Hasil Generate ke Database
+  // Mutasi 2: Terapkan / Publish Hasil Generate ke Database
   const applyMutation = useMutation({
     mutationFn: async () => {
-      if (!previewResult) throw new Error('Data pratinjau belum siap');
+      if (!previewResult) return;
       const res = await api.post('/jadwal/generate/sma-apply', {
         tahun_ajaran_id: previewResult.tahun_ajaran_id,
         target_kelas_ids: previewResult.target_kelas_ids,
         replace_existing: replaceExisting,
-        schedules: previewResult.generated_schedules.map((s: any) => ({
+        schedules: (previewResult.generated_schedules || []).map((s: any) => ({
           kelas_id: s.kelas_id,
           guru_id: s.guru_id,
           mapel_id: s.mapel_id,
-          tahun_ajaran_id: previewResult.tahun_ajaran_id,
           hari: s.hari,
           jam_mulai: s.jam_mulai,
           jam_selesai: s.jam_selesai,
@@ -143,9 +145,9 @@ export default function BuatJadwalOtomatisPage() {
       return res.data;
     },
     onSuccess: (res) => {
-      setSuccessMessage(
-        res?.message || 'Jadwal pelajaran SMA berhasil diterapkan ke database.',
-      );
+      const msg = res?.message || 'Jadwal pelajaran SMA berhasil diterapkan ke database.';
+      setSuccessMessage(msg);
+      toast.success('Jadwal berhasil diterapkan', msg);
       queryClient.invalidateQueries({ queryKey: ['jadwal-list'] });
       setTimeout(() => {
         router.push('/admin/jadwal');
@@ -156,6 +158,7 @@ export default function BuatJadwalOtomatisPage() {
         err.response?.data?.message ||
         'Terjadi kesalahan saat menyimpan jadwal pelajaran.';
       setErrorMessage(msg);
+      toast.error('Gagal menyimpan jadwal', msg);
     },
   });
 

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Jurusan, Kelas, MataPelajaran } from '@/types/api';
 import { cn, generateMapelKode } from '@/lib/utils';
+import { toast } from '@/components/ui/toast';
 import {
   extractMapelFromFile,
   downloadMapelTemplate,
@@ -114,8 +115,10 @@ export default function AdminMasterDataPage() {
       setIsJurusanModalOpen(false);
       setJurusanNama('');
       setJurusanKode('');
-      setSuccessMessage('Jurusan berhasil ditambahkan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Jurusan baru berhasil ditambahkan');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menambahkan jurusan', err?.response?.data?.message || 'Kode jurusan mungkin sudah digunakan');
     },
   });
 
@@ -130,8 +133,10 @@ export default function AdminMasterDataPage() {
     onSuccess: () => {
       refetchKelas();
       setIsKelasModalOpen(false);
-      setSuccessMessage('Kelas berhasil dibuat');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Kelas baru berhasil dibuat');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal membuat kelas', err?.response?.data?.message || 'Nama rombel mungkin sudah terdaftar');
     },
   });
 
@@ -143,8 +148,10 @@ export default function AdminMasterDataPage() {
       setIsMapelModalOpen(false);
       setMapelNama('');
       setMapelKode('');
-      setSuccessMessage('Mata pelajaran berhasil ditambahkan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Mata pelajaran berhasil ditambahkan');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menambahkan mata pelajaran', err?.response?.data?.message || 'Periksa kembali data');
     },
   });
 
@@ -158,11 +165,12 @@ export default function AdminMasterDataPage() {
       setImportedMapel([]);
       setUploadedFileName(null);
       setExtractError(null);
-      setSuccessMessage(res.data?.message || 'Mata pelajaran berhasil diimpor');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Mata pelajaran berhasil diimpor', `${res.data?.data?.count || importedMapel.length} mata pelajaran disimpan`);
     },
     onError: (err: any) => {
-      setExtractError(err?.response?.data?.message || 'Gagal mengimpor data mata pelajaran');
+      const msg = err?.response?.data?.message || 'Gagal mengimpor data mata pelajaran';
+      setExtractError(msg);
+      toast.error('Gagal mengimpor mata pelajaran', msg);
     },
   });
 

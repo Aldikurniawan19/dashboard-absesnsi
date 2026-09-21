@@ -9,6 +9,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge, StatusBadge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/toast';
 import { Absensi, SesiAbsensi } from '@/types/api';
 import { cn, formatWaktu } from '@/lib/utils';
 import {
@@ -90,8 +91,12 @@ export default function SesiProjectorPage() {
     mutationFn: async (menit: number) => {
       await api.patch(`/sesi/${sesiId}`, { tambah_menit: menit });
     },
-    onSuccess: () => {
+    onSuccess: (_, menit) => {
       refetch();
+      toast.success(`Waktu sesi berhasil ditambah ${menit} menit`);
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menambah waktu', err?.response?.data?.message || 'Terjadi kesalahan');
     },
   });
 
@@ -102,6 +107,10 @@ export default function SesiProjectorPage() {
     },
     onSuccess: () => {
       refetch();
+      toast.success('Sesi absensi berhasil ditutup');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menutup sesi', err?.response?.data?.message || 'Terjadi kesalahan');
     },
   });
 
@@ -132,9 +141,11 @@ export default function SesiProjectorPage() {
         document.body.removeChild(textArea);
       }
       setCopied(true);
+      toast.success('Kode token QR berhasil disalin');
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
       console.error('Gagal menyalin kode:', err);
+      toast.error('Gagal menyalin kode');
     }
   };
 

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/select';
 import { Badge, StatusBadge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/toast';
 import { JadwalPelajaran } from '@/types/api';
 import { formatTanggal, getHariName } from '@/lib/utils';
 import { Calendar, Clock, Play, QrCode, UserCheck } from 'lucide-react';
@@ -51,11 +52,15 @@ export default function GuruJadwalPage() {
       queryClient.invalidateQueries({ queryKey: ['guru-jadwal'] });
       queryClient.invalidateQueries({ queryKey: ['jadwal-hari-ini'] });
       setIsModalOpen(false);
+      toast.success('Sesi absensi berhasil dibuka');
       // Langsung arahkan ke tampilan layar proyektor
       const sesiId = data?.sesi?.id || data?.id;
       if (sesiId) {
         router.push(`/guru/sesi/${sesiId}`);
       }
+    },
+    onError: (err: any) => {
+      toast.error('Gagal membuka sesi absensi', err?.response?.data?.message || 'Terjadi kesalahan');
     },
   });
 

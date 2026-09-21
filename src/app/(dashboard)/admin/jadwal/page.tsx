@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn, getHariName } from '@/lib/utils';
 import { JadwalPelajaran, Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
+import { toast } from '@/components/ui/toast';
 import {
   extractJadwalFromFile,
   downloadJadwalTemplate,
@@ -365,8 +366,7 @@ export default function AdminJadwalPage() {
       setIsEditModalOpen(false);
       setEditingJadwal(null);
       setFormErrors([]);
-      setSuccessMessage('Jadwal pelajaran berhasil diperbarui');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Jadwal pelajaran berhasil diperbarui');
     },
     onError: (err: any) => {
       const errs = err.response?.data?.errors;
@@ -375,6 +375,7 @@ export default function AdminJadwalPage() {
       } else {
         setFormErrors([err.response?.data?.message || 'Gagal memperbarui jadwal']);
       }
+      toast.error('Gagal memperbarui jadwal', err?.response?.data?.message || 'Terjadi bentrok atau kesalahan');
     },
   });
 
@@ -400,16 +401,13 @@ export default function AdminJadwalPage() {
       setImportedJadwal([]);
       setUploadedFileName(null);
       setExtractError(null);
-      setSuccessMessage(res.data?.message || 'Jadwal pelajaran berhasil diimpor');
-      setTimeout(() => setSuccessMessage(null), 3500);
+      toast.success('Jadwal pelajaran berhasil diimpor', res.data?.message || `${importedJadwal.length} jadwal tersimpan`);
     },
     onError: (err: any) => {
       const errs = err?.response?.data?.errors;
-      if (Array.isArray(errs)) {
-        setExtractError(errs.join(' • '));
-      } else {
-        setExtractError(err?.response?.data?.message || 'Gagal mengimpor data jadwal');
-      }
+      const msg = Array.isArray(errs) ? errs.join(' • ') : (err?.response?.data?.message || 'Gagal mengimpor data jadwal');
+      setExtractError(msg);
+      toast.error('Gagal mengimpor jadwal', msg);
     },
   });
 
@@ -418,8 +416,10 @@ export default function AdminJadwalPage() {
     mutationFn: async (id: string) => api.delete(`/jadwal/${id}`),
     onSuccess: () => {
       refetchAllSchedules();
-      setSuccessMessage('Jadwal berhasil dihapus');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Jadwal berhasil dihapus');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menghapus jadwal', err?.response?.data?.message || 'Terjadi kesalahan sistem');
     },
   });
 
@@ -434,11 +434,10 @@ export default function AdminJadwalPage() {
     onSuccess: (res) => {
       refetchAllSchedules();
       setIsDuplicateModalOpen(false);
-      setSuccessMessage(res.message || 'Duplikasi jadwal berhasil');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Duplikasi jadwal berhasil', res?.message || 'Seluruh jadwal telah disalin');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Gagal menduplikasi jadwal');
+      toast.error('Gagal menduplikasi jadwal', err.response?.data?.message || 'Terjadi kesalahan');
     },
   });
 

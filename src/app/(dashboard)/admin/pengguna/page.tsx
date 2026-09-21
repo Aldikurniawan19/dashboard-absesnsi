@@ -12,6 +12,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
+import { toast } from '@/components/ui/toast';
 import { CheckCircle2, GraduationCap, Plus, Search, Shield, UserCheck, Users } from 'lucide-react';
 import { Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
 
@@ -22,6 +24,7 @@ export default function AdminPenggunaPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [filterTingkatSiswa, setFilterTingkatSiswa] = useState<string>('ALL');
+  const [siswaPage, setSiswaPage] = useState<number>(1);
 
   // Modal Siswa
   const [isSiswaModalOpen, setIsSiswaModalOpen] = useState(false);
@@ -75,12 +78,21 @@ export default function AdminPenggunaPage() {
 
   // Data Siswa
   const { data: siswaRes, refetch: refetchSiswa } = useQuery({
-    queryKey: ['siswa-list', activeTab === 'siswa' ? search : ''],
+    queryKey: ['siswa-list', activeTab === 'siswa' ? search : '', filterTingkatSiswa, siswaPage],
     queryFn: async () => {
-      const searchParam = activeTab === 'siswa' && search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await api.get(`/users/siswa${searchParam}`);
+      const params = new URLSearchParams();
+      params.append('page', String(siswaPage));
+      params.append('limit', '20');
+      if (activeTab === 'siswa' && search) {
+        params.append('search', search);
+      }
+      if (filterTingkatSiswa !== 'ALL') {
+        params.append('tingkat', filterTingkatSiswa);
+      }
+      const res = await api.get(`/users/siswa?${params.toString()}`);
       return res.data;
     },
+    enabled: activeTab === 'siswa',
   });
 
   // Data Guru
@@ -120,14 +132,11 @@ export default function AdminPenggunaPage() {
   const totalSiswa = typeof siswaRes?.meta?.total === 'number'
     ? siswaRes.meta.total
     : siswaList.length;
+  const totalPagesSiswa = typeof siswaRes?.meta?.totalPages === 'number'
+    ? siswaRes.meta.totalPages
+    : Math.ceil(totalSiswa / 20);
 
-  const filteredSiswaList = React.useMemo(() => {
-    if (filterTingkatSiswa === 'ALL') return siswaList;
-    return siswaList.filter((s: any) => {
-      const currentClass = s?.riwayat_kelas?.[0]?.kelas;
-      return currentClass && String(currentClass.tingkat) === filterTingkatSiswa;
-    });
-  }, [siswaList, filterTingkatSiswa]);
+  const filteredSiswaList = siswaList;
 
   const guruList = Array.isArray(guruRes?.data)
     ? guruRes.data
@@ -161,8 +170,10 @@ export default function AdminPenggunaPage() {
       setSiswaNama('');
       setSiswaNisn('');
       setSiswaEmail('');
-      setSuccessMessage('Siswa baru berhasil ditambahkan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Siswa baru berhasil ditambahkan');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menambahkan siswa', err?.response?.data?.message || 'Periksa kembali data input');
     },
   });
 
@@ -183,8 +194,10 @@ export default function AdminPenggunaPage() {
       setGuruNip('');
       setGuruEmail('');
       setGuruSelectedMapel([]);
-      setSuccessMessage('Guru baru berhasil ditambahkan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Guru baru berhasil ditambahkan');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menambahkan guru', err?.response?.data?.message || 'Periksa kembali data input');
     },
   });
 
@@ -199,8 +212,10 @@ export default function AdminPenggunaPage() {
     onSuccess: () => {
       refetchGuru();
       setIsWaliModalOpen(false);
-      setSuccessMessage('Penugasan wali kelas berhasil disimpan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Penugasan wali kelas berhasil disimpan');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menugaskan wali kelas', err?.response?.data?.message || 'Terjadi kesalahan sistem');
     },
   });
 
@@ -225,6 +240,7 @@ export default function AdminPenggunaPage() {
           setActiveTab(tab as any);
           setSearch('');
           setFilterTingkatSiswa('ALL');
+          setSiswaPage(1);
         }}
         items={[
           { id: 'siswa', label: 'Data Siswa', count: totalSiswa, icon: <GraduationCap className="w-4 h-4" /> },
@@ -244,14 +260,20 @@ export default function AdminPenggunaPage() {
                   <Input
                     placeholder="Cari nama, NISN, atau email siswa..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setSiswaPage(1);
+                    }}
                     className="pl-9"
                   />
                 </div>
                 <div className="w-full sm:w-48 shrink-0">
                   <Select
                     value={filterTingkatSiswa}
-                    onChange={(e) => setFilterTingkatSiswa(e.target.value)}
+                    onChange={(e) => {
+                      setFilterTingkatSiswa(e.target.value);
+                      setSiswaPage(1);
+                    }}
                     options={[
                       { label: 'Semua Tingkatan', value: 'ALL' },
                       ...availableTingkat.map((t) => ({
@@ -277,37 +299,49 @@ export default function AdminPenggunaPage() {
             </div>
 
             {filteredSiswaList.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama Siswa</TableHead>
-                    <TableHead>NISN</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Kelas Saat Ini</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSiswaList.map((s: any) => {
-                    const currentClass = s?.riwayat_kelas?.[0]?.kelas;
-                    return (
-                      <TableRow key={s?.id}>
-                        <TableCell className="font-semibold text-foreground">{s?.nama}</TableCell>
-                        <TableCell className="text-foreground-muted">{s?.nisn}</TableCell>
-                        <TableCell className="text-foreground-muted">{s?.email}</TableCell>
-                        <TableCell>
-                          {currentClass ? (
-                            <Badge variant="info">
-                              {currentClass.tingkat} {currentClass.jurusan?.kode} {currentClass.nama_rombel}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-foreground-muted italic">Belum terdaftar</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nama Siswa</TableHead>
+                      <TableHead>NISN</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Kelas Saat Ini</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSiswaList.map((s: any) => {
+                      const currentClass = s?.riwayat_kelas?.[0]?.kelas;
+                      return (
+                        <TableRow key={s?.id}>
+                          <TableCell className="font-semibold text-foreground">{s?.nama}</TableCell>
+                          <TableCell className="text-foreground-muted">{s?.nisn}</TableCell>
+                          <TableCell className="text-foreground-muted">{s?.email}</TableCell>
+                          <TableCell>
+                            {currentClass ? (
+                              <Badge variant="info">
+                                {currentClass.tingkat} {currentClass.jurusan?.kode} {currentClass.nama_rombel}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-foreground-muted italic">Belum terdaftar</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                <Pagination
+                  currentPage={siswaPage}
+                  totalPages={totalPagesSiswa}
+                  totalItems={totalSiswa}
+                  pageSize={20}
+                  onPageChange={setSiswaPage}
+                  itemLabel="siswa"
+                  hideOnSinglePage={true}
+                />
+              </div>
             ) : (
               <div className="py-8 text-center text-xs text-foreground-muted border border-dashed border-border rounded-lg">
                 Tidak ada data siswa untuk tingkatan atau pencarian ini.
@@ -360,42 +394,51 @@ export default function AdminPenggunaPage() {
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nama Guru</TableHead>
-                  <TableHead>NIP</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Mata Pelajaran Diampu</TableHead>
-                  <TableHead>Penugasan Wali Kelas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {guruList.map((g: any) => {
-                  const mapelNames = Array.isArray(g?.guru_mapel) ? g.guru_mapel.map((m: any) => m?.mapel?.nama).filter(Boolean).join(', ') : '';
-                  const waliKelas = g?.penugasan_wali_kelas?.[0];
-                  return (
-                    <TableRow key={g?.id}>
-                      <TableCell className="font-semibold text-foreground">{g?.nama}</TableCell>
-                      <TableCell className="text-foreground-muted">{g?.nip}</TableCell>
-                      <TableCell className="text-foreground-muted">{g?.email}</TableCell>
-                      <TableCell className="text-xs text-foreground max-w-xs truncate">
-                        {mapelNames || <span className="italic text-foreground-muted">Belum ada</span>}
-                      </TableCell>
-                      <TableCell>
-                        {waliKelas ? (
-                          <Badge variant="warning">
-                            Kelas {waliKelas.kelas?.tingkat} {waliKelas.kelas?.jurusan?.kode} {waliKelas.kelas?.nama_rombel}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-foreground-muted italic">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            {guruList.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Guru & NIP</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Mata Pelajaran Diampu</TableHead>
+                    <TableHead>Penugasan Wali Kelas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {guruList.map((g: any) => {
+                    const mapelNames = Array.isArray(g?.guru_mapel) ? g.guru_mapel.map((m: any) => m?.mapel?.nama).filter(Boolean).join(', ') : '';
+                    const waliKelas = g?.penugasan_wali_kelas?.[0];
+                    return (
+                      <TableRow key={g?.id}>
+                        <TableCell>
+                          <div className="font-semibold text-foreground">{g?.nama}</div>
+                          <div className="text-xs text-foreground-muted mt-0.5">
+                            {g?.nip ? `NIP. ${g.nip}` : <span className="italic">NIP belum terdaftar</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-foreground-muted">{g?.email}</TableCell>
+                        <TableCell className="text-xs text-foreground max-w-xs">
+                          {mapelNames || <span className="italic text-foreground-muted">Belum ada</span>}
+                        </TableCell>
+                        <TableCell>
+                          {waliKelas ? (
+                            <Badge variant="warning">
+                              Kelas {waliKelas.kelas?.tingkat} {waliKelas.kelas?.jurusan?.kode} {waliKelas.kelas?.nama_rombel}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-foreground-muted italic">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="py-8 text-center text-xs text-foreground-muted border border-dashed border-border rounded-lg">
+                Tidak ada data guru untuk pencarian ini.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

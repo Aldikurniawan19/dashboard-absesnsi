@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sekolah } from '@/types/api';
+import { toast } from '@/components/ui/toast';
 import { CheckCircle2, MapPin, Save, Settings, ShieldAlert, Smartphone } from 'lucide-react';
 
 export default function AdminSekolahPage() {
@@ -56,8 +57,10 @@ export default function AdminSekolahPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sekolah-config'] });
-      setSuccessMessage('Konfigurasi sekolah berhasil disimpan');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Konfigurasi sekolah berhasil disimpan');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menyimpan konfigurasi', err?.response?.data?.message || 'Terjadi kesalahan sistem');
     },
   });
 

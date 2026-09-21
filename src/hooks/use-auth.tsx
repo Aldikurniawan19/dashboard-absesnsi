@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserProfile, UserRole } from '@/types/api';
+import { toast } from '@/components/ui/toast';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     queryClient.clear();
     setUser(loggedInUser);
+    toast.success('Berhasil masuk', `Selamat datang, ${loggedInUser.nama}`);
     router.push('/');
   };
 
@@ -84,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('user');
       queryClient.clear();
       setUser(null);
+      toast.info('Berhasil keluar');
       router.push('/login');
     }
   };

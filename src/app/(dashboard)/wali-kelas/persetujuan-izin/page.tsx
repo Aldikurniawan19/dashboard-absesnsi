@@ -10,6 +10,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge, StatusBadge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/toast';
 import { formatTanggal } from '@/lib/utils';
 import { PengajuanIzin } from '@/types/api';
 import { Check, CheckCircle2, Eye, FileText, X, XCircle } from 'lucide-react';
@@ -46,14 +47,19 @@ export default function PersetujuanIzinPage() {
         status,
         alasan_penolakan: alasan,
       });
-      return res.data;
+      return { ...res.data, status };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['izin-pending'] });
+      const statusText = data?.status === 'DISETUJUI' ? 'disetujui' : 'ditolak';
+      toast.success(`Pengajuan izin berhasil ${statusText}`);
       setSelectedIzin(null);
       setActionType(null);
       setAlasanTolak('');
       refetch();
+    },
+    onError: (err: any) => {
+      toast.error('Gagal memproses permohonan', err?.response?.data?.message || 'Terjadi kesalahan sistem');
     },
   });
 
