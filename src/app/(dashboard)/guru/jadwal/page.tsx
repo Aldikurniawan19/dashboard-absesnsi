@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/select';
 import { Badge, StatusBadge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/loading-state';
 import { toast } from '@/components/ui/toast';
 import { JadwalPelajaran } from '@/types/api';
 import { formatTanggal, getHariName } from '@/lib/utils';
@@ -153,15 +154,15 @@ export default function GuruJadwalPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
           [1, 2, 3].map((i) => (
-            <Card key={i} className="p-6 space-y-4 animate-pulse">
+            <Card key={i} className="p-6 space-y-4">
               <div className="flex justify-between items-center">
-                <div className="h-5 bg-border/60 rounded w-1/4" />
-                <div className="h-4 bg-border/40 rounded w-1/3" />
+                <Skeleton className="h-5 w-1/4" />
+                <Skeleton className="h-4 w-1/3" />
               </div>
-              <div className="h-6 bg-border/60 rounded w-3/4" />
-              <div className="h-4 bg-border/40 rounded w-1/2" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
               <div className="pt-4 border-t border-border/60">
-                <div className="h-9 bg-border/40 rounded-lg w-full" />
+                <Skeleton className="h-9 w-full rounded-lg" />
               </div>
             </Card>
           ))

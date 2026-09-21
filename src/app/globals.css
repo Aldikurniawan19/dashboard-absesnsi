@@ -41,3 +41,31 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-foreground-muted);
 }
+
+@layer utilities {
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--color-border);
+    opacity: 0.6;
+  }
+
+  .skeleton-shimmer::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.35) 30%,
+      rgba(255, 255, 255, 0.75) 50%,
+      rgba(255, 255, 255, 0.35) 70%,
+      transparent 100%
+    );
+    animation: shimmer 1.8s infinite ease-in-out;
+    content: '';
+  }
+}

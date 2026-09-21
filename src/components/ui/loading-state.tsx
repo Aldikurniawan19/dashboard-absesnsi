@@ -44,6 +44,19 @@ export function LoadingScreen({
   );
 }
 
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  className?: string;
+}
+
+export function Skeleton({ className, ...props }: SkeletonProps) {
+  return (
+    <div
+      className={cn('skeleton-shimmer rounded-md', className)}
+      {...props}
+    />
+  );
+}
+
 interface TableSkeletonProps {
   rows?: number;
   cols?: number;
@@ -58,19 +71,19 @@ export function TableSkeleton({ rows = 5, cols, columns, className }: TableSkele
     <div className={cn('w-full space-y-3 rounded-lg border border-border p-4 bg-surface', className)}>
       {/* Header Skeleton */}
       <div className="flex items-center justify-between pb-3 border-b border-border/60">
-        <div className="h-4 w-1/4 bg-border/60 rounded animate-pulse" />
-        <div className="h-4 w-16 bg-border/40 rounded animate-pulse" />
+        <Skeleton className="h-4.5 w-1/4" />
+        <Skeleton className="h-4 w-16" />
       </div>
 
       {/* Row Skeletons */}
-      <div className="space-y-2.5 pt-1">
+      <div className="space-y-3 pt-1">
         {Array.from({ length: rows }).map((_, rIdx) => (
           <div key={`row-${rIdx}`} className="flex items-center gap-4 py-2 border-b border-border/30 last:border-0">
             {Array.from({ length: columnCount }).map((_, cIdx) => (
-              <div
+              <Skeleton
                 key={`col-${rIdx}-${cIdx}`}
                 className={cn(
-                  'h-3.5 bg-border/40 rounded animate-pulse',
+                  'h-4',
                   cIdx === 0 ? 'w-1/3' : cIdx === 1 ? 'w-1/4' : 'flex-1',
                 )}
               />
@@ -88,17 +101,17 @@ interface PageSkeletonProps {
 
 export function PageSkeleton({ className }: PageSkeletonProps) {
   return (
-    <div className={cn('space-y-6 animate-pulse', className)}>
+    <div className={cn('space-y-6', className)}>
       {/* Page Header Skeleton */}
       <div className="space-y-2">
-        <div className="h-7 w-64 bg-border/70 rounded-md" />
-        <div className="h-4 w-96 max-w-full bg-border/40 rounded-md" />
+        <Skeleton className="h-7 w-64" />
+        <Skeleton className="h-4 w-96 max-w-full" />
       </div>
 
       {/* Filter / Top Bar Skeleton */}
       <div className="h-14 w-full bg-surface border border-border rounded-xl p-3 flex items-center justify-between gap-4">
-        <div className="h-8 w-48 bg-border/50 rounded-md" />
-        <div className="h-8 w-32 bg-border/40 rounded-md" />
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-8 w-32" />
       </div>
 
       {/* Main Table Skeleton */}

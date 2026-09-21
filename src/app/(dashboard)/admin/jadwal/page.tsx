@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/loading-state';
 import { cn, getHariName } from '@/lib/utils';
 import { JadwalPelajaran, Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
 import { toast } from '@/components/ui/toast';
@@ -589,10 +590,10 @@ export default function AdminJadwalPage() {
       {isSchedulesLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-surface p-4 space-y-3 animate-pulse">
-              <div className="h-5 bg-border/60 rounded w-1/3 mb-2" />
-              <div className="h-20 bg-border/40 rounded-lg" />
-              <div className="h-20 bg-border/40 rounded-lg" />
+            <div key={i} className="rounded-xl border border-border bg-surface p-4 space-y-3">
+              <Skeleton className="h-5 w-1/3 mb-2" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-20 w-full rounded-lg" />
             </div>
           ))}
         </div>
