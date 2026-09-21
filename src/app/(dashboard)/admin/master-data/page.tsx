@@ -28,6 +28,7 @@ import {
 import { Jurusan, Kelas, MataPelajaran } from '@/types/api';
 import { cn, generateMapelKode } from '@/lib/utils';
 import { toast } from '@/components/ui/toast';
+import { TableSkeleton } from '@/components/ui/loading-state';
 import {
   extractMapelFromFile,
   downloadMapelTemplate,
@@ -65,7 +66,7 @@ export default function AdminMasterDataPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Queries
-  const { data: jurusanList = [], refetch: refetchJurusan } = useQuery<Jurusan[]>({
+  const { data: jurusanList = [], refetch: refetchJurusan, isLoading: isJurusanLoading } = useQuery<Jurusan[]>({
     queryKey: ['jurusan-list'],
     queryFn: async () => {
       const res = await api.get('/master/jurusan');
@@ -74,7 +75,7 @@ export default function AdminMasterDataPage() {
     },
   });
 
-  const { data: kelasList = [], refetch: refetchKelas } = useQuery<Kelas[]>({
+  const { data: kelasList = [], refetch: refetchKelas, isLoading: isKelasLoading } = useQuery<Kelas[]>({
     queryKey: ['kelas-list'],
     queryFn: async () => {
       const res = await api.get('/master/kelas');
@@ -83,7 +84,7 @@ export default function AdminMasterDataPage() {
     },
   });
 
-  const { data: mapelList = [], refetch: refetchMapel } = useQuery<MataPelajaran[]>({
+  const { data: mapelList = [], refetch: refetchMapel, isLoading: isMapelLoading } = useQuery<MataPelajaran[]>({
     queryKey: ['mapel-list'],
     queryFn: async () => {
       const res = await api.get('/master/mapel');
@@ -274,7 +275,9 @@ export default function AdminMasterDataPage() {
               </div>
             </div>
 
-            {filteredKelasList.length > 0 ? (
+            {isKelasLoading ? (
+              <TableSkeleton rows={6} columns={4} />
+            ) : filteredKelasList.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -324,22 +327,26 @@ export default function AdminMasterDataPage() {
               </Button>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nama Jurusan</TableHead>
-                  <TableHead>Kode Singkatan</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(jurusanList || []).map((j) => (
-                  <TableRow key={j.id}>
-                    <TableCell className="font-semibold text-foreground">{j.nama}</TableCell>
-                    <TableCell className="text-foreground-muted">{j.kode}</TableCell>
+            {isJurusanLoading ? (
+              <TableSkeleton rows={4} columns={2} />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Jurusan</TableHead>
+                    <TableHead>Kode Singkatan</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {(jurusanList || []).map((j) => (
+                    <TableRow key={j.id}>
+                      <TableCell className="font-semibold text-foreground">{j.nama}</TableCell>
+                      <TableCell className="text-foreground-muted">{j.kode}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}
@@ -372,22 +379,26 @@ export default function AdminMasterDataPage() {
               </Button>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nama Mata Pelajaran</TableHead>
-                  <TableHead>Kode Pelajaran</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(mapelList || []).map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="font-semibold text-foreground">{m.nama}</TableCell>
-                    <TableCell className="text-foreground-muted">{m.kode}</TableCell>
+            {isMapelLoading ? (
+              <TableSkeleton rows={6} columns={2} />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Mata Pelajaran</TableHead>
+                    <TableHead>Kode Pelajaran</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {(mapelList || []).map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-semibold text-foreground">{m.nama}</TableCell>
+                      <TableCell className="text-foreground-muted">{m.kode}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}
@@ -398,6 +409,8 @@ export default function AdminMasterDataPage() {
         onClose={() => setIsKelasModalOpen(false)}
         title="Tambah Rombel Kelas Baru"
         description="Pilih tingkat, jurusan, dan nomor rombel (misal 10 + MIPA + 1 -> 10 MIPA 1)"
+        isLoading={createKelasMutation.isPending}
+        loadingMessage="Menyimpan kelas baru..."
       >
         <form
           onSubmit={(e) => {
@@ -460,6 +473,8 @@ export default function AdminMasterDataPage() {
         isOpen={isJurusanModalOpen}
         onClose={() => setIsJurusanModalOpen(false)}
         title="Tambah Jurusan Baru"
+        isLoading={createJurusanMutation.isPending}
+        loadingMessage="Menyimpan jurusan baru..."
       >
         <form
           onSubmit={(e) => {
@@ -513,6 +528,8 @@ export default function AdminMasterDataPage() {
         }}
         title="Tambah Mata Pelajaran"
         description="Tambahkan mata pelajaran baru secara manual atau impor dari file Excel / CSV"
+        isLoading={createMapelMutation.isPending || createMapelBulkMutation.isPending}
+        loadingMessage={createMapelBulkMutation.isPending ? 'Mengimpor mata pelajaran...' : 'Menyimpan mata pelajaran...'}
       >
         {/* Toggle Mode Segment */}
         <div className="flex border-b border-border mb-4">

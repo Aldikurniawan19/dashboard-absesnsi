@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { TableSkeleton } from '@/components/ui/loading-state';
 import { Kelas, TahunAjaran } from '@/types/api';
 import { GraduationCap, Trophy, Users } from 'lucide-react';
 
@@ -110,7 +111,7 @@ export default function LaporanKelasPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-xs text-foreground-muted">Memuat data rekap kelas...</p>
+            <TableSkeleton rows={8} columns={10} />
           ) : studentList.length > 0 ? (
             <Table>
               <TableHeader>

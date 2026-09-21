@@ -12,6 +12,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/toast';
+import { TableSkeleton } from '@/components/ui/loading-state';
 import { formatTanggal } from '@/lib/utils';
 import { TahunAjaran } from '@/types/api';
 import { CheckCircle2, Clock, Plus, Power, Trash2 } from 'lucide-react';
@@ -120,7 +121,7 @@ export default function AdminTahunAjaranPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-xs text-foreground-muted">Memuat data tahun ajaran...</p>
+            <TableSkeleton rows={4} columns={6} />
           ) : list && list.length > 0 ? (
             <Table>
               <TableHeader>
@@ -166,6 +167,7 @@ export default function AdminTahunAjaranPage() {
                               deleteMutation.mutate(item.id);
                             }
                           }}
+                          disabled={deleteMutation.isPending}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -189,6 +191,8 @@ export default function AdminTahunAjaranPage() {
         onClose={() => setIsModalOpen(false)}
         title="Tambah Tahun Ajaran Baru"
         description="Jadwal untuk tahun ajaran baru akan dibuat sebagai draft hingga diaktifkan"
+        isLoading={createMutation.isPending}
+        loadingMessage="Menyimpan tahun ajaran baru..."
       >
         <form
           onSubmit={(e) => {

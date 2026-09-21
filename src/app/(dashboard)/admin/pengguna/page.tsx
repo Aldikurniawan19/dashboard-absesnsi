@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { toast } from '@/components/ui/toast';
+import { TableSkeleton } from '@/components/ui/loading-state';
 import { CheckCircle2, GraduationCap, Plus, Search, Shield, UserCheck, Users } from 'lucide-react';
 import { Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
 
@@ -77,7 +78,7 @@ export default function AdminPenggunaPage() {
   });
 
   // Data Siswa
-  const { data: siswaRes, refetch: refetchSiswa } = useQuery({
+  const { data: siswaRes, refetch: refetchSiswa, isLoading: isSiswaLoading } = useQuery({
     queryKey: ['siswa-list', activeTab === 'siswa' ? search : '', filterTingkatSiswa, siswaPage],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -96,7 +97,7 @@ export default function AdminPenggunaPage() {
   });
 
   // Data Guru
-  const { data: guruRes, refetch: refetchGuru } = useQuery({
+  const { data: guruRes, refetch: refetchGuru, isLoading: isGuruLoading } = useQuery({
     queryKey: ['guru-list', activeTab === 'guru' ? search : ''],
     queryFn: async () => {
       const searchParam = activeTab === 'guru' && search ? `?search=${encodeURIComponent(search)}` : '';
@@ -106,7 +107,7 @@ export default function AdminPenggunaPage() {
   });
 
   // Data Admin
-  const { data: adminRes, refetch: refetchAdmin } = useQuery({
+  const { data: adminRes, refetch: refetchAdmin, isLoading: isAdminLoading } = useQuery({
     queryKey: ['admin-list'],
     queryFn: async () => {
       const res = await api.get('/users/admin');
@@ -298,7 +299,9 @@ export default function AdminPenggunaPage() {
               </Button>
             </div>
 
-            {filteredSiswaList.length > 0 ? (
+            {isSiswaLoading ? (
+              <TableSkeleton rows={8} columns={4} />
+            ) : filteredSiswaList.length > 0 ? (
               <div className="space-y-4">
                 <Table>
                   <TableHeader>
@@ -394,7 +397,9 @@ export default function AdminPenggunaPage() {
               </div>
             </div>
 
-            {guruList.length > 0 ? (
+            {isGuruLoading ? (
+              <TableSkeleton rows={8} columns={4} />
+            ) : guruList.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -448,26 +453,30 @@ export default function AdminPenggunaPage() {
         <Card>
           <CardContent className="p-6 space-y-4">
             <h3 className="text-base font-semibold text-foreground">Daftar Akun Administrator Sekolah</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nama Admin</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Peran Akses</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {adminList.map((a: any) => (
-                  <TableRow key={a?.id}>
-                    <TableCell className="font-semibold text-foreground">{a?.nama}</TableCell>
-                    <TableCell className="text-foreground-muted">{a?.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="info">Administrator Utama</Badge>
-                    </TableCell>
+            {isAdminLoading ? (
+              <TableSkeleton rows={4} columns={3} />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Admin</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Peran Akses</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {adminList.map((a: any) => (
+                    <TableRow key={a?.id}>
+                      <TableCell className="font-semibold text-foreground">{a?.nama}</TableCell>
+                      <TableCell className="text-foreground-muted">{a?.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="info">Administrator Utama</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}
@@ -477,6 +486,8 @@ export default function AdminPenggunaPage() {
         isOpen={isSiswaModalOpen}
         onClose={() => setIsSiswaModalOpen(false)}
         title="Tambah Siswa Baru"
+        isLoading={createSiswaMutation.isPending}
+        loadingMessage="Menyimpan data siswa baru..."
       >
         <form
           onSubmit={(e) => {
@@ -551,6 +562,8 @@ export default function AdminPenggunaPage() {
         isOpen={isGuruModalOpen}
         onClose={() => setIsGuruModalOpen(false)}
         title="Tambah Guru Baru"
+        isLoading={createGuruMutation.isPending}
+        loadingMessage="Menyimpan data guru baru..."
       >
         <form
           onSubmit={(e) => {
@@ -643,6 +656,8 @@ export default function AdminPenggunaPage() {
         onClose={() => setIsWaliModalOpen(false)}
         title="Tugaskan Guru Sebagai Wali Kelas"
         description="Penugasan wali kelas dicatat per tahun ajaran untuk menjaga riwayat"
+        isLoading={assignWaliMutation.isPending}
+        loadingMessage="Menyimpan penugasan wali kelas..."
       >
         <form
           onSubmit={(e) => {

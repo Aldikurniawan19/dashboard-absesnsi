@@ -134,7 +134,7 @@ export default function AdminJadwalPage() {
   });
 
   // Query Semua Jadwal pada Tahun Ajaran yang Dipilih
-  const { data: allSchedules = [], refetch: refetchAllSchedules } = useQuery<JadwalPelajaran[]>({
+  const { data: allSchedules = [], refetch: refetchAllSchedules, isLoading: isSchedulesLoading } = useQuery<JadwalPelajaran[]>({
     queryKey: ['jadwal-all-schedules', selectedTahunId],
     queryFn: async () => {
       if (!selectedTahunId) return [];
@@ -586,163 +586,175 @@ export default function AdminJadwalPage() {
       </Card>
 
       {/* GRID JADWAL MINGGUAN (3 KOLOM LEGA, TIDAK BERTUMPUK) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {days.map((dayNum) => {
-          const daySchedules = currentClassSchedules
-            .filter((j) => j.hari === dayNum)
-            .sort((a, b) => a.jam_mulai.localeCompare(b.jam_mulai));
+      {isSchedulesLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-surface p-4 space-y-3 animate-pulse">
+              <div className="h-5 bg-border/60 rounded w-1/3 mb-2" />
+              <div className="h-20 bg-border/40 rounded-lg" />
+              <div className="h-20 bg-border/40 rounded-lg" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {days.map((dayNum) => {
+            const daySchedules = currentClassSchedules
+              .filter((j) => j.hari === dayNum)
+              .sort((a, b) => a.jam_mulai.localeCompare(b.jam_mulai));
 
-          return (
-            <div
-              key={dayNum}
-              className="flex flex-col rounded-xl border border-border bg-surface overflow-hidden shadow-subtle"
-            >
-              {/* Header Hari */}
-              <div className="px-4 py-3 bg-surface-muted/60 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Calendar className="w-4.5 h-4.5 text-primary shrink-0" />
-                  <span className="font-bold text-base text-foreground tracking-tight">
-                    {dayNames[dayNum]}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs bg-surface text-foreground-muted border border-border/60 px-2 py-0.5 rounded-full font-medium">
-                    {daySchedules.length} Sesi
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenImport(dayNum)}
-                    className="text-foreground-muted hover:text-primary hover:bg-primary-light p-1 rounded transition-colors"
-                    title={`Impor jadwal di hari ${dayNames[dayNum]}`}
-                  >
-                    <UploadCloud className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Daftar Jadwal Hari Ini */}
-              <div className="p-3.5 space-y-3 flex-1 min-h-[220px] bg-background/20">
-                {daySchedules.map((j) => {
-                  const clashInfo = clashingScheduleMap.get(j.id);
-                  const isClashing = !!clashInfo;
-
-                  return (
-                    <div
-                      key={j.id}
-                      className={cn(
-                        'group rounded-lg border p-3.5 transition-all bg-surface',
-                        isClashing
-                          ? 'border-danger/60 bg-danger-light/10 ring-1 ring-danger/30'
-                          : 'border-border/80 hover:border-primary/50 hover:shadow-xs',
-                      )}
+            return (
+              <div
+                key={dayNum}
+                className="flex flex-col rounded-xl border border-border bg-surface overflow-hidden shadow-subtle"
+              >
+                {/* Header Hari */}
+                <div className="px-4 py-3 bg-surface-muted/60 border-b border-border flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Calendar className="w-4.5 h-4.5 text-primary shrink-0" />
+                    <span className="font-bold text-base text-foreground tracking-tight">
+                      {dayNames[dayNum]}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-surface text-foreground-muted border border-border/60 px-2 py-0.5 rounded-full font-medium">
+                      {daySchedules.length} Sesi
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenImport(dayNum)}
+                      className="text-foreground-muted hover:text-primary hover:bg-primary-light p-1 rounded transition-colors"
+                      title={`Impor jadwal di hari ${dayNames[dayNum]}`}
                     >
-                      {/* Baris 1: Waktu & Aksi */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-primary bg-primary-light px-2.5 py-0.5 rounded-md">
-                          <Clock className="w-3.5 h-3.5 shrink-0" />
-                          <span>
-                            {j.jam_mulai} - {j.jam_selesai}
-                          </span>
-                        </div>
+                      <UploadCloud className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
 
-                        <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(j)}
-                            className="text-foreground-muted hover:text-primary p-1 rounded hover:bg-surface-muted transition-colors"
-                            title="Ubah Jadwal"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  `Hapus jadwal ${j.mapel?.nama} (${j.jam_mulai} - ${j.jam_selesai})?`,
-                                )
-                              ) {
-                                deleteMutation.mutate(j.id);
-                              }
-                            }}
-                            className="text-foreground-muted hover:text-danger p-1 rounded hover:bg-danger-light transition-colors"
-                            title="Hapus Jadwal"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                {/* Daftar Jadwal Hari Ini */}
+                <div className="p-3.5 space-y-3 flex-1 min-h-[220px] bg-background/20">
+                  {daySchedules.map((j) => {
+                    const clashInfo = clashingScheduleMap.get(j.id);
+                    const isClashing = !!clashInfo;
 
-                      {/* Baris 2: Nama Mata Pelajaran */}
-                      <div className="mb-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-semibold text-sm text-foreground leading-snug">
-                            {j.mapel?.nama}
-                          </h4>
-                          {j.mapel?.kode && (
-                            <span className="shrink-0 text-[11px] font-mono font-medium text-foreground-muted bg-surface-muted px-1.5 py-0.5 rounded border border-border/40">
-                              {j.mapel.kode}
+                    return (
+                      <div
+                        key={j.id}
+                        className={cn(
+                          'group rounded-lg border p-3.5 transition-all bg-surface',
+                          isClashing
+                            ? 'border-danger/60 bg-danger-light/10 ring-1 ring-danger/30'
+                            : 'border-border/80 hover:border-primary/50 hover:shadow-xs',
+                        )}
+                      >
+                        {/* Baris 1: Waktu & Aksi */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-primary bg-primary-light px-2.5 py-0.5 rounded-md">
+                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                            <span>
+                              {j.jam_mulai} - {j.jam_selesai}
                             </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Baris 3: Guru Pengampu */}
-                      <div className="pt-2 border-t border-border/50 text-xs text-foreground-muted flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <span className="truncate font-medium text-foreground">
-                          {j.guru?.nama || 'Guru Belum Ditugaskan'}
-                        </span>
-                      </div>
-
-                      {/* Peringatan Bentrok dengan Tombol Lihat Detail */}
-                      {isClashing && (
-                        <div className="mt-2.5 pt-2 border-t border-danger/20 flex flex-col gap-1.5 text-xs text-danger">
-                          <div className="flex items-start gap-1.5 font-medium">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-danger" />
-                            <span className="leading-tight">{clashInfo.message}</span>
                           </div>
 
-                          <div className="flex items-center justify-between pl-5 pt-0.5">
-                            <span className="text-[11px] text-danger/80 truncate max-w-[170px]">
-                              Lawan: {clashInfo.opponentKelasName} ({clashInfo.opponentTime})
-                            </span>
+                          <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100">
                             <button
                               type="button"
-                              onClick={() =>
-                                setViewingConflict({ current: j, conflict: clashInfo })
-                              }
-                              className="text-[11px] font-semibold text-danger hover:underline inline-flex items-center gap-1 shrink-0 ml-1"
+                              onClick={() => handleOpenEdit(j)}
+                              className="text-foreground-muted hover:text-primary p-1 rounded hover:bg-surface-muted transition-colors"
+                              title="Ubah Jadwal"
                             >
-                              <Eye className="w-3 h-3" />
-                              <span>Lihat Detail</span>
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Hapus jadwal ${j.mapel?.nama} (${j.jam_mulai} - ${j.jam_selesai})?`,
+                                  )
+                                ) {
+                                  deleteMutation.mutate(j.id);
+                                }
+                              }}
+                              className="text-foreground-muted hover:text-danger p-1 rounded hover:bg-danger-light transition-colors"
+                              title="Hapus Jadwal"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
 
-                {daySchedules.length === 0 && (
-                  <div className="h-full min-h-[140px] flex flex-col items-center justify-center p-4 border border-dashed border-border/70 rounded-lg text-center">
-                    <p className="text-xs text-foreground-muted mb-2">Tidak ada sesi pelajaran</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenImport(dayNum)}
-                      className="text-xs h-7 px-2.5 gap-1 border-dashed"
-                    >
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      <span>Impor Jadwal</span>
-                    </Button>
-                  </div>
-                )}
+                        {/* Baris 2: Nama Mata Pelajaran */}
+                        <div className="mb-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-semibold text-sm text-foreground leading-snug">
+                              {j.mapel?.nama}
+                            </h4>
+                            {j.mapel?.kode && (
+                              <span className="shrink-0 text-[11px] font-mono font-medium text-foreground-muted bg-surface-muted px-1.5 py-0.5 rounded border border-border/40">
+                                {j.mapel.kode}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Baris 3: Guru Pengampu */}
+                        <div className="pt-2 border-t border-border/50 text-xs text-foreground-muted flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <span className="truncate font-medium text-foreground">
+                            {j.guru?.nama || 'Guru Belum Ditugaskan'}
+                          </span>
+                        </div>
+
+                        {/* Peringatan Bentrok dengan Tombol Lihat Detail */}
+                        {isClashing && (
+                          <div className="mt-2.5 pt-2 border-t border-danger/20 flex flex-col gap-1.5 text-xs text-danger">
+                            <div className="flex items-start gap-1.5 font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-danger" />
+                              <span className="leading-tight">{clashInfo.message}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between pl-5 pt-0.5">
+                              <span className="text-[11px] text-danger/80 truncate max-w-[170px]">
+                                Lawan: {clashInfo.opponentKelasName} ({clashInfo.opponentTime})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setViewingConflict({ current: j, conflict: clashInfo })
+                                }
+                                className="text-[11px] font-semibold text-danger hover:underline inline-flex items-center gap-1 shrink-0 ml-1"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>Lihat Detail</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {daySchedules.length === 0 && (
+                    <div className="h-full min-h-[140px] flex flex-col items-center justify-center p-4 border border-dashed border-border/70 rounded-lg text-center">
+                      <p className="text-xs text-foreground-muted mb-2">Tidak ada sesi pelajaran</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenImport(dayNum)}
+                        className="text-xs h-7 px-2.5 gap-1 border-dashed"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        <span>Impor Jadwal</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* MODAL LIHAT DETAIL BENTROK JADWAL */}
       <Dialog
@@ -909,6 +921,8 @@ export default function AdminJadwalPage() {
         title="Impor Jadwal Pelajaran (Excel / CSV)"
         description={`Target Kelas: ${selectedKelas?.nama_lengkap || ''} — Tahun Ajaran ${selectedTahun?.nama ?? ''} (${selectedTahun?.semester ?? ''})`}
         maxWidth="xl"
+        isLoading={importJadwalBulkMutation.isPending || isExtracting}
+        loadingMessage={isExtracting ? 'Mengekstrak file jadwal...' : 'Mengimpor jadwal pelajaran...'}
       >
         <div className="space-y-4 py-1">
           {extractError && (
@@ -1100,6 +1114,8 @@ export default function AdminJadwalPage() {
         onClose={() => setIsEditModalOpen(false)}
         title="Ubah Jadwal Pelajaran"
         description={`Kelas: ${selectedKelas?.nama_lengkap || ''} — Tahun Ajaran ${selectedTahun?.nama ?? ''}`}
+        isLoading={updateJadwalMutation.isPending}
+        loadingMessage="Menyimpan perubahan jadwal pelajaran..."
       >
         <form
           onSubmit={(e) => {
@@ -1246,6 +1262,8 @@ export default function AdminJadwalPage() {
         onClose={() => setIsDuplicateModalOpen(false)}
         title="Duplikasi Jadwal dari Semester Lain"
         description={`Salin seluruh jadwal dari tahun ajaran lama ke tujuan: ${selectedTahun?.nama ?? ''} ${selectedTahun?.semester ?? ''}`}
+        isLoading={duplicateMutation.isPending}
+        loadingMessage="Menduplikasi seluruh jadwal pelajaran..."
       >
         <div className="space-y-4 py-2">
           <Select

@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge, StatusBadge } from '@/components/ui/badge';
+import { PageSkeleton } from '@/components/ui/loading-state';
 import { getHariName, formatTanggal } from '@/lib/utils';
 import {
   BookOpen,
@@ -75,11 +76,7 @@ export default function DashboardPage() {
   });
 
   if (isLoadingAuth) {
-    return (
-      <div className="p-8 text-center text-sm text-foreground-muted">
-        Memuat data akun...
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

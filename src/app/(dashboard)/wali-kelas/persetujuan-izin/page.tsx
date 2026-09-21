@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/toast';
+import { TableSkeleton } from '@/components/ui/loading-state';
 import { formatTanggal } from '@/lib/utils';
 import { PengajuanIzin } from '@/types/api';
 import { Check, CheckCircle2, Eye, FileText, X, XCircle } from 'lucide-react';
@@ -99,7 +100,7 @@ export default function PersetujuanIzinPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-xs text-foreground-muted">Memuat permohonan izin...</p>
+            <TableSkeleton rows={4} columns={7} />
           ) : pendingList && pendingList.length > 0 ? (
             <Table>
               <TableHeader>
@@ -191,6 +192,8 @@ export default function PersetujuanIzinPage() {
             : 'Tolak Permohonan Izin'
         }
         description={`Siswa: ${selectedIzin?.siswa?.nama} (Tanggal: ${selectedIzin ? formatTanggal(selectedIzin.tanggal) : ''})`}
+        isLoading={approveMutation.isPending}
+        loadingMessage={actionType === 'DISETUJUI' ? 'Menyetujui permohonan izin...' : 'Memproses penolakan izin...'}
       >
         <div className="space-y-4 py-2">
           {actionType === 'DISETUJUI' ? (
