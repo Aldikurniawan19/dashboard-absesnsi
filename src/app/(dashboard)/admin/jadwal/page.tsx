@@ -144,6 +144,19 @@ export default function AdminJadwalPage() {
   const [examPreviewResult, setExamPreviewResult] = useState<any>(null);
   const [selectedExamDetail, setSelectedExamDetail] = useState<any>(null);
 
+  // State Modal Konfirmasi Hapus Kustom (Tanpa window.confirm browser)
+  const [examToDelete, setExamToDelete] = useState<{
+    id: string;
+    nama: string;
+    totalItems: number;
+    isActive: boolean;
+  } | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState<{
+    id: string;
+    mapelNama: string;
+    waktu: string;
+  } | null>(null);
+
   // Feedback Error & Success
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -222,6 +235,16 @@ export default function AdminJadwalPage() {
       setSelectedKelasId(kelasList[0].id);
     }
   }, [kelasList, selectedKelasId]);
+
+  // Otomatis terapkan & update langsung Tanggal Selesai Ujian saat Tanggal Mulai atau Sesi berubah
+  useEffect(() => {
+    if (examTanggalMulai) {
+      const autoEnd = calculateExamEndDate(examTanggalMulai, examSesiPerHari, mapelList.length);
+      if (autoEnd && autoEnd !== examTanggalSelesai) {
+        setExamTanggalSelesai(autoEnd);
+      }
+    }
+  }, [examTanggalMulai, examSesiPerHari, mapelList]);
 
   // Jadwal Kelas Terpilih
   const currentClassSchedules = useMemo(() => {
@@ -829,13 +852,11 @@ export default function AdminJadwalPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (
-                                  confirm(
-                                    `Hapus jadwal ${j.mapel?.nama} (${j.jam_mulai} - ${j.jam_selesai})?`,
-                                  )
-                                ) {
-                                  deleteMutation.mutate(j.id);
-                                }
+                                setScheduleToDelete({
+                                  id: j.id,
+                                  mapelNama: j.mapel?.nama || 'Mata Pelajaran',
+                                  waktu: `${dayNames[j.hari]}, ${j.jam_mulai} - ${j.jam_selesai}`,
+                                });
                               }}
                               className="text-foreground-muted hover:text-danger p-1 rounded hover:bg-danger-light transition-colors"
                               title="Hapus Jadwal"
@@ -1598,9 +1619,12 @@ export default function AdminJadwalPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(`Hapus jadwal ujian "${exam.nama_ujian}"?`)) {
-                                  deleteExamMutation.mutate(exam.id);
-                                }
+                                setExamToDelete({
+                                  id: exam.id,
+                                  nama: exam.nama_ujian,
+                                  totalItems: exam.total_items,
+                                  isActive: Boolean(exam.is_active),
+                                });
                               }}
                               disabled={deleteExamMutation.isPending}
                               className="text-foreground-muted hover:text-danger p-2 rounded-lg hover:bg-danger-light transition-colors"
@@ -1697,53 +1721,36 @@ export default function AdminJadwalPage() {
                 </div>
               </div>
 
-              {/* Tanggal Mulai & Tanggal Selesai (Otomatis Dihitung) */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Tanggal Mulai Ujian"
-                    type="date"
-                    value={examTanggalMulai}
-                    onChange={(e) => {
-                      const newStart = e.target.value;
-                      setExamTanggalMulai(newStart);
-                      if (newStart) {
-                        const autoEnd = calculateExamEndDate(newStart, examSesiPerHari, mapelList.length);
-                        setExamTanggalSelesai(autoEnd);
-                      }
-                    }}
-                    required
-                  />
-                  <Input
-                    label="Tanggal Selesai Ujian"
-                    type="date"
-                    value={examTanggalSelesai}
-                    onChange={(e) => setExamTanggalSelesai(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* Banner Informasi Kalkulasi Otomatis */}
-                <div className="p-3.5 bg-primary-light/40 border border-primary/20 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 text-xs text-primary">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 shrink-0 text-primary" />
-                    <span>
-                      <strong>Kalkulasi Otomatis:</strong> {mapelList.length > 0 ? mapelList.length : 12} Mata Pelajaran ÷ {examSesiPerHari} sesi/hari = <strong>{Math.max(1, Math.ceil((mapelList.length > 0 ? mapelList.length : 12) / Math.max(1, examSesiPerHari)))} hari ujian efektif</strong> (Senin–Sabtu, Minggu libur).
-                    </span>
-                  </div>
-                  {examTanggalMulai && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const autoEnd = calculateExamEndDate(examTanggalMulai, examSesiPerHari, mapelList.length);
-                        setExamTanggalSelesai(autoEnd);
-                      }}
-                      className="px-2.5 py-1 bg-white dark:bg-surface border border-primary/30 rounded-lg font-semibold hover:bg-primary hover:text-white transition-colors self-start sm:self-auto shrink-0"
-                    >
-                      Hitung Ulang Tanggal Selesai
-                    </button>
-                  )}
-                </div>
+              {/* Tanggal Mulai & Tanggal Selesai (Langsung Diterapkan Otomatis) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Tanggal Mulai Ujian"
+                  type="date"
+                  value={examTanggalMulai}
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    setExamTanggalMulai(newStart);
+                    if (newStart) {
+                      const autoEnd = calculateExamEndDate(newStart, examSesiPerHari, mapelList.length);
+                      setExamTanggalSelesai(autoEnd);
+                    } else {
+                      setExamTanggalSelesai('');
+                    }
+                  }}
+                  required
+                />
+                <Input
+                  label="Tanggal Selesai Ujian"
+                  type="date"
+                  value={examTanggalSelesai}
+                  onChange={(e) => setExamTanggalSelesai(e.target.value)}
+                  helperText={
+                    examTanggalSelesai && examTanggalMulai
+                      ? `Otomatis terisi untuk seluruh mapel (${Math.max(1, Math.ceil((mapelList.length > 0 ? mapelList.length : 12) / Math.max(1, examSesiPerHari)))} hari efektif, Minggu libur)`
+                      : 'Otomatis terisi setelah tanggal mulai dipilih'
+                  }
+                  required
+                />
               </div>
 
               {/* Sesi Ujian Harian */}
@@ -1986,6 +1993,117 @@ export default function AdminJadwalPage() {
               </div>
             </div>
           )}
+        </div>
+      </Dialog>
+
+      {/* MODAL KONFIRMASI HAPUS JADWAL REGULER */}
+      <Dialog
+        isOpen={!!scheduleToDelete}
+        onClose={() => setScheduleToDelete(null)}
+        title="Konfirmasi Hapus Jadwal"
+        maxWidth="md"
+        isLoading={deleteMutation.isPending}
+        loadingMessage="Menghapus jadwal..."
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3.5 p-4 rounded-xl border border-danger/20 bg-danger-light/30">
+            <div className="p-2 rounded-lg bg-danger text-white shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-sm">
+              <p className="font-bold text-foreground">
+                Hapus jadwal mata pelajaran ini?
+              </p>
+              <p className="text-foreground-muted text-xs">
+                Jadwal <strong className="text-foreground">{scheduleToDelete?.mapelNama}</strong> ({scheduleToDelete?.waktu}) akan dihapus dari kelas ini.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setScheduleToDelete(null)}
+              disabled={deleteMutation.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                if (scheduleToDelete) {
+                  deleteMutation.mutate(scheduleToDelete.id, {
+                    onSettled: () => setScheduleToDelete(null),
+                  });
+                }
+              }}
+              isLoading={deleteMutation.isPending}
+              className="gap-2 font-bold"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hapus Jadwal</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* MODAL KONFIRMASI HAPUS JADWAL UJIAN */}
+      <Dialog
+        isOpen={!!examToDelete}
+        onClose={() => setExamToDelete(null)}
+        title="Konfirmasi Hapus Jadwal Ujian"
+        maxWidth="md"
+        isLoading={deleteExamMutation.isPending}
+        loadingMessage="Menghapus jadwal ujian..."
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3.5 p-4 rounded-xl border border-danger/20 bg-danger-light/30">
+            <div className="p-2 rounded-lg bg-danger text-white shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-sm">
+              <p className="font-bold text-foreground">
+                Apakah Anda yakin ingin menghapus jadwal ujian ini?
+              </p>
+              <p className="text-foreground-muted text-xs">
+                Jadwal <strong className="text-foreground">{examToDelete?.nama}</strong> beserta seluruh <strong>{examToDelete?.totalItems} sesi ujian</strong> akan dihapus permanen.
+              </p>
+              {examToDelete?.isActive && (
+                <p className="text-warning font-semibold text-xs mt-1">
+                  Perhatian: Jadwal ujian ini saat ini sedang aktif di aplikasi mobile siswa & guru.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setExamToDelete(null)}
+              disabled={deleteExamMutation.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                if (examToDelete) {
+                  deleteExamMutation.mutate(examToDelete.id, {
+                    onSettled: () => setExamToDelete(null),
+                  });
+                }
+              }}
+              isLoading={deleteExamMutation.isPending}
+              className="gap-2 font-bold"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hapus Jadwal Ujian</span>
+            </Button>
+          </div>
         </div>
       </Dialog>
     </div>
