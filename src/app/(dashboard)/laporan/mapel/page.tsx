@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/use-auth';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
@@ -20,20 +21,22 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { BookOpen, FileSpreadsheet, PieChart as PieIcon, Users } from 'lucide-react';
+import { BookOpen, AlertCircle, PieChart as PieIcon, Users } from 'lucide-react';
 
 export default function LaporanMapelPage() {
+  const { user, isAdmin } = useAuth();
   const [selectedMapelId, setSelectedMapelId] = useState('');
   const [selectedTahunId, setSelectedTahunId] = useState('');
 
-  // Queries
-  const { data: mapelList = [] } = useQuery<MataPelajaran[]>({
-    queryKey: ['mapel-list'],
+  // Queries - daftar mapel untuk laporan (Guru: mapel yang diampu, Admin: semua mapel)
+  const { data: mapelList = [], isLoading: isLoadingMapel } = useQuery<MataPelajaran[]>({
+    queryKey: ['mapel-list-laporan', user?.role],
     queryFn: async () => {
-      const res = await api.get('/master/mapel');
+      const res = await api.get('/laporan/mapel-list');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data) ? data : [];
     },
+    enabled: !!user,
   });
 
   const { data: tahunList = [] } = useQuery<TahunAjaran[]>({
@@ -45,9 +48,13 @@ export default function LaporanMapelPage() {
     },
   });
 
-  React.useEffect(() => {
-    if (Array.isArray(mapelList) && mapelList.length > 0 && !selectedMapelId) {
-      setSelectedMapelId(mapelList[0].id);
+  useEffect(() => {
+    if (Array.isArray(mapelList) && mapelList.length > 0) {
+      if (!selectedMapelId || !mapelList.some((m) => m.id === selectedMapelId)) {
+        setSelectedMapelId(mapelList[0].id);
+      }
+    } else if (Array.isArray(mapelList) && mapelList.length === 0) {
+      setSelectedMapelId('');
     }
     if (Array.isArray(tahunList) && tahunList.length > 0 && !selectedTahunId) {
       const active = tahunList.find((t) => t.status === 'AKTIF') || tahunList[0];
@@ -56,7 +63,7 @@ export default function LaporanMapelPage() {
   }, [mapelList, tahunList, selectedMapelId, selectedTahunId]);
 
   // Query Laporan
-  const { data: reportData, isLoading } = useQuery({
+  const { data: reportData, isLoading: isLoadingReport } = useQuery({
     queryKey: ['laporan-mapel', selectedMapelId, selectedTahunId],
     queryFn: async () => {
       if (!selectedMapelId) return null;
@@ -86,7 +93,11 @@ export default function LaporanMapelPage() {
     <div className="space-y-6">
       <PageHeader
         title="Laporan & Statistik Mata Pelajaran"
-        description="Analisis tren dan persentase kehadiran siswa per mata pelajaran"
+        description={
+          isAdmin
+            ? 'Analisis tren dan persentase kehadiran siswa per mata pelajaran di seluruh sekolah'
+            : 'Analisis tren dan persentase kehadiran siswa pada mata pelajaran yang Anda ampu'
+        }
       />
 
       {/* Filter */}
@@ -96,13 +107,25 @@ export default function LaporanMapelPage() {
             <Select
               searchable
               searchPlaceholder="Cari mata pelajaran..."
-              label="Pilih Mata Pelajaran"
+              label={isAdmin ? 'Pilih Mata Pelajaran' : 'Pilih Mata Pelajaran yang Diampu'}
               value={selectedMapelId}
               onChange={(e) => setSelectedMapelId(e.target.value)}
-              options={(mapelList || []).map((m) => ({
-                label: `${m.nama} (${m.kode})`,
-                value: m.id,
-              }))}
+              disabled={isLoadingMapel || mapelList.length === 0}
+              options={
+                mapelList.length > 0
+                  ? (mapelList || []).map((m) => ({
+                      label: `${m.nama} (${m.kode})`,
+                      value: m.id,
+                    }))
+                  : [
+                      {
+                        label: isAdmin
+                          ? '-- Belum ada data mata pelajaran --'
+                          : '-- Tidak ada mata pelajaran yang diampu --',
+                        value: '',
+                      },
+                    ]
+              }
             />
 
             <Select
@@ -116,10 +139,30 @@ export default function LaporanMapelPage() {
                 value: t.id,
               }))}
             />
-
           </div>
         </CardContent>
       </Card>
+
+      {/* State jika guru belum memiliki mapel ampu */}
+      {!isLoadingMapel && mapelList.length === 0 && (
+        <Card className="border-border">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mb-3">
+              <AlertCircle className="w-6 h-6 text-foreground-muted" />
+            </div>
+            <h3 className="text-base font-medium text-foreground">
+              {isAdmin
+                ? 'Belum Ada Data Mata Pelajaran'
+                : 'Belum Ada Mata Pelajaran yang Diampu'}
+            </h3>
+            <p className="text-xs text-foreground-muted mt-1 max-w-md mx-auto">
+              {isAdmin
+                ? 'Silakan tambahkan data mata pelajaran terlebih dahulu di menu Data Master.'
+                : 'Anda belum terdaftar mengampu mata pelajaran apapun. Silakan hubungi administrator untuk penugasan mata pelajaran.'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Overview Cards */}
       {selectedMapelId && (
