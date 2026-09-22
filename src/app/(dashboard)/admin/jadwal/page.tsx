@@ -629,6 +629,15 @@ export default function AdminJadwalPage() {
               size="md"
               onClick={() => {
                 setExamActiveTab('list');
+                if (!examTanggalMulai) {
+                  const today = new Date();
+                  const yyyy = today.getFullYear();
+                  const mm = String(today.getMonth() + 1).padStart(2, '0');
+                  const dd = String(today.getDate()).padStart(2, '0');
+                  const todayStr = `${yyyy}-${mm}-${dd}`;
+                  setExamTanggalMulai(todayStr);
+                  setExamTanggalSelesai(calculateExamEndDate(todayStr, examSesiPerHari, mapelList.length));
+                }
                 setIsExamModalOpen(true);
               }}
               className="gap-2"
@@ -1638,6 +1647,15 @@ export default function AdminJadwalPage() {
                       onClick={() => {
                         setExamJenis(preset.jenis);
                         setExamNama(`${preset.title} ${selectedTahun?.nama ?? ''}`);
+                        if (!examTanggalMulai) {
+                          const today = new Date();
+                          const yyyy = today.getFullYear();
+                          const mm = String(today.getMonth() + 1).padStart(2, '0');
+                          const dd = String(today.getDate()).padStart(2, '0');
+                          const todayStr = `${yyyy}-${mm}-${dd}`;
+                          setExamTanggalMulai(todayStr);
+                          setExamTanggalSelesai(calculateExamEndDate(todayStr, examSesiPerHari, mapelList.length));
+                        }
                       }}
                       className={cn(
                         'p-3 rounded-xl border text-left text-sm font-medium transition-all',
@@ -1679,22 +1697,53 @@ export default function AdminJadwalPage() {
                 </div>
               </div>
 
-              {/* Tanggal Mulai & Tanggal Selesai */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Tanggal Mulai Ujian"
-                  type="date"
-                  value={examTanggalMulai}
-                  onChange={(e) => setExamTanggalMulai(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Tanggal Selesai Ujian"
-                  type="date"
-                  value={examTanggalSelesai}
-                  onChange={(e) => setExamTanggalSelesai(e.target.value)}
-                  required
-                />
+              {/* Tanggal Mulai & Tanggal Selesai (Otomatis Dihitung) */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Tanggal Mulai Ujian"
+                    type="date"
+                    value={examTanggalMulai}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setExamTanggalMulai(newStart);
+                      if (newStart) {
+                        const autoEnd = calculateExamEndDate(newStart, examSesiPerHari, mapelList.length);
+                        setExamTanggalSelesai(autoEnd);
+                      }
+                    }}
+                    required
+                  />
+                  <Input
+                    label="Tanggal Selesai Ujian"
+                    type="date"
+                    value={examTanggalSelesai}
+                    onChange={(e) => setExamTanggalSelesai(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Banner Informasi Kalkulasi Otomatis */}
+                <div className="p-3.5 bg-primary-light/40 border border-primary/20 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 text-xs text-primary">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 shrink-0 text-primary" />
+                    <span>
+                      <strong>Kalkulasi Otomatis:</strong> {mapelList.length > 0 ? mapelList.length : 12} Mata Pelajaran ÷ {examSesiPerHari} sesi/hari = <strong>{Math.max(1, Math.ceil((mapelList.length > 0 ? mapelList.length : 12) / Math.max(1, examSesiPerHari)))} hari ujian efektif</strong> (Senin–Sabtu, Minggu libur).
+                    </span>
+                  </div>
+                  {examTanggalMulai && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const autoEnd = calculateExamEndDate(examTanggalMulai, examSesiPerHari, mapelList.length);
+                        setExamTanggalSelesai(autoEnd);
+                      }}
+                      className="px-2.5 py-1 bg-white dark:bg-surface border border-primary/30 rounded-lg font-semibold hover:bg-primary hover:text-white transition-colors self-start sm:self-auto shrink-0"
+                    >
+                      Hitung Ulang Tanggal Selesai
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Sesi Ujian Harian */}
@@ -1707,7 +1756,12 @@ export default function AdminJadwalPage() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setExamSesiPerHari(1)}
+                      onClick={() => {
+                        setExamSesiPerHari(1);
+                        if (examTanggalMulai) {
+                          setExamTanggalSelesai(calculateExamEndDate(examTanggalMulai, 1, mapelList.length));
+                        }
+                      }}
                       className={cn(
                         'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
                         examSesiPerHari === 1
@@ -1719,7 +1773,12 @@ export default function AdminJadwalPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExamSesiPerHari(2)}
+                      onClick={() => {
+                        setExamSesiPerHari(2);
+                        if (examTanggalMulai) {
+                          setExamTanggalSelesai(calculateExamEndDate(examTanggalMulai, 2, mapelList.length));
+                        }
+                      }}
                       className={cn(
                         'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
                         examSesiPerHari === 2
