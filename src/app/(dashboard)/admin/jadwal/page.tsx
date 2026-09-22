@@ -27,15 +27,19 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  Copy,
   Download,
   Edit3,
   Eye,
   FileSpreadsheet,
   GraduationCap,
+  Info,
+  Layers,
   Loader2,
   Plus,
+  RefreshCw,
   Sparkles,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
   UploadCloud,
   User,
@@ -89,9 +93,22 @@ export default function AdminJadwalPage() {
     conflict: ConflictInfo;
   } | null>(null);
 
-  // State Modal Duplikasi
-  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
-  const [sumberTahunId, setSumberTahunId] = useState('');
+  // State Modal Jadwal Ujian (PTS / PAS / PAT)
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [examActiveTab, setExamActiveTab] = useState<'list' | 'create' | 'preview'>('list');
+  const [examNama, setExamNama] = useState('Penilaian Tengah Semester (PTS) Ganjil');
+  const [examJenis, setExamJenis] = useState('PTS');
+  const [examTanggalMulai, setExamTanggalMulai] = useState('');
+  const [examTanggalSelesai, setExamTanggalSelesai] = useState('');
+  const [examIsActive, setExamIsActive] = useState(true);
+  const [examSesiPerHari, setExamSesiPerHari] = useState(2);
+  const [examJamSesi1Mulai, setExamJamSesi1Mulai] = useState('07:30');
+  const [examJamSesi1Selesai, setExamJamSesi1Selesai] = useState('09:00');
+  const [examJamSesi2Mulai, setExamJamSesi2Mulai] = useState('09:30');
+  const [examJamSesi2Selesai, setExamJamSesi2Selesai] = useState('11:00');
+  const [examTargetTingkat, setExamTargetTingkat] = useState<number[]>([10, 11, 12]);
+  const [examPreviewResult, setExamPreviewResult] = useState<any>(null);
+  const [selectedExamDetail, setSelectedExamDetail] = useState<any>(null);
 
   // Feedback Error & Success
   const [formErrors, setFormErrors] = useState<string[]>([]);
@@ -140,6 +157,18 @@ export default function AdminJadwalPage() {
     queryFn: async () => {
       if (!selectedTahunId) return [];
       const res = await api.get(`/jadwal?tahun_ajaran_id=${selectedTahunId}`);
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!selectedTahunId,
+  });
+
+  // Query Daftar Jadwal Ujian
+  const { data: examList = [], refetch: refetchExams, isLoading: isExamsLoading } = useQuery<any[]>({
+    queryKey: ['jadwal-ujian-list', selectedTahunId],
+    queryFn: async () => {
+      if (!selectedTahunId) return [];
+      const res = await api.get(`/jadwal/ujian?tahun_ajaran_id=${selectedTahunId}`);
       const data = res.data?.data ?? res.data;
       return Array.isArray(data) ? data : [];
     },
@@ -424,21 +453,108 @@ export default function AdminJadwalPage() {
     },
   });
 
-  // Mutasi Duplikasi
-  const duplicateMutation = useMutation({
+  // Mutasi Generate Preview Jadwal Ujian
+  const generateExamPreviewMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/jadwal/tahun-ajaran/${selectedTahunId}/duplikasi`, {
-        sumber_tahun_ajaran_id: sumberTahunId,
-      });
+      if (!examTanggalMulai || !examTanggalSelesai) {
+        throw new Error('Tanggal mulai dan selesai ujian wajib diisi');
+      }
+      const payload = {
+        nama_ujian: examNama,
+        jenis: examJenis,
+        tahun_ajaran_id: selectedTahunId,
+        tanggal_mulai: examTanggalMulai,
+        tanggal_selesai: examTanggalSelesai,
+        sesi_per_hari: examSesiPerHari,
+        jam_mulai_sesi_1: examJamSesi1Mulai,
+        jam_selesai_sesi_1: examJamSesi1Selesai,
+        jam_mulai_sesi_2: examJamSesi2Mulai,
+        jam_selesai_sesi_2: examJamSesi2Selesai,
+        tingkat_list: examTargetTingkat,
+        is_active: examIsActive,
+      };
+      const res = await api.post('/jadwal/ujian/generate-preview', payload);
+      return res.data?.data ?? res.data;
+    },
+    onSuccess: (data) => {
+      setExamPreviewResult(data);
+      setExamActiveTab('preview');
+      toast.success('Pratinjau jadwal ujian berhasil dibuat', `${data.total_items} sesi ujian siap ditinjau`);
+    },
+    onError: (err: any) => {
+      toast.error('Gagal membuat pratinjau ujian', err?.response?.data?.message || err?.message || 'Periksa parameter tanggal');
+    },
+  });
+
+  // Mutasi Simpan Jadwal Ujian
+  const createExamMutation = useMutation({
+    mutationFn: async () => {
+      if (!examPreviewResult) throw new Error('Data pratinjau belum dibuat');
+      const payload = {
+        nama_ujian: examPreviewResult.nama_ujian,
+        jenis: examPreviewResult.jenis,
+        tahun_ajaran_id: selectedTahunId,
+        tanggal_mulai: examPreviewResult.tanggal_mulai,
+        tanggal_selesai: examPreviewResult.tanggal_selesai,
+        is_active: examIsActive,
+        items: (examPreviewResult.items || []).map((item: any) => ({
+          kelas_id: item.kelas_id,
+          mapel_id: item.mapel_id,
+          guru_id: item.guru_id || undefined,
+          tanggal: item.tanggal,
+          hari: item.hari,
+          jam_mulai: item.jam_mulai,
+          jam_selesai: item.jam_selesai,
+          ruangan: item.ruangan,
+        })),
+      };
+      const res = await api.post('/jadwal/ujian', payload);
       return res.data;
     },
     onSuccess: (res) => {
-      refetchAllSchedules();
-      setIsDuplicateModalOpen(false);
-      toast.success('Duplikasi jadwal berhasil', res?.message || 'Seluruh jadwal telah disalin');
+      refetchExams();
+      setExamActiveTab('list');
+      setExamPreviewResult(null);
+      toast.success(
+        'Jadwal ujian berhasil disimpan',
+        res?.is_active
+          ? 'Status: AKTIF (Jadwal ujian sekarang tampil di aplikasi mobile)'
+          : 'Status: NONAKTIF (Disimpan sebagai draf)',
+      );
     },
     onError: (err: any) => {
-      toast.error('Gagal menduplikasi jadwal', err.response?.data?.message || 'Terjadi kesalahan');
+      toast.error('Gagal menyimpan jadwal ujian', err?.response?.data?.message || 'Terjadi kesalahan sistem');
+    },
+  });
+
+  // Mutasi Ubah Status Aktivasi Ujian (Aktifkan / Nonaktifkan untuk Mobile)
+  const toggleExamStatusMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const res = await api.patch(`/jadwal/ujian/${id}/toggle-status`, { is_active });
+      return res.data;
+    },
+    onSuccess: (res) => {
+      refetchExams();
+      toast.success(res?.message || 'Status aktivasi ujian berhasil diubah');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal mengubah status ujian', err?.response?.data?.message || 'Terjadi kesalahan');
+    },
+  });
+
+  // Mutasi Hapus Jadwal Ujian
+  const deleteExamMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/jadwal/ujian/${id}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      refetchExams();
+      if (selectedExamDetail) setSelectedExamDetail(null);
+      toast.success('Jadwal ujian berhasil dihapus');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menghapus jadwal ujian', err?.response?.data?.message || 'Terjadi kesalahan');
     },
   });
 
@@ -475,19 +591,21 @@ export default function AdminJadwalPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <Button
-              variant="outline"
+              variant={examList.some((e: any) => e.is_active) ? 'secondary' : 'outline'}
               size="md"
               onClick={() => {
-                const draft = Array.isArray(tahunList)
-                  ? tahunList.find((t) => t.id !== selectedTahunId)
-                  : undefined;
-                if (draft) setSumberTahunId(draft.id);
-                setIsDuplicateModalOpen(true);
+                setExamActiveTab('list');
+                setIsExamModalOpen(true);
               }}
               className="gap-2"
             >
-              <Copy className="w-4 h-4" />
-              <span>Duplikasi Jadwal</span>
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Jadwal Ujian</span>
+              {examList.some((e: any) => e.is_active) && (
+                <span className="ml-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-warning text-white uppercase tracking-wider">
+                  Aktif
+                </span>
+              )}
             </Button>
             <Button
               variant="outline"
@@ -1256,54 +1374,518 @@ export default function AdminJadwalPage() {
         </form>
       </Dialog>
 
-      {/* MODAL DUPLIKASI */}
+      {/* MODAL KELOLA & BUAT JADWAL UJIAN (DENGAN OPSI AKTIFKAN KE MOBILE) */}
       <Dialog
-        isOpen={isDuplicateModalOpen}
-        onClose={() => setIsDuplicateModalOpen(false)}
-        title="Duplikasi Jadwal dari Semester Lain"
-        description={`Salin seluruh jadwal dari tahun ajaran lama ke tujuan: ${selectedTahun?.nama ?? ''} ${selectedTahun?.semester ?? ''}`}
-        isLoading={duplicateMutation.isPending}
-        loadingMessage="Menduplikasi seluruh jadwal pelajaran..."
+        isOpen={isExamModalOpen}
+        onClose={() => {
+          setIsExamModalOpen(false);
+          setSelectedExamDetail(null);
+        }}
+        title="Jadwal Ujian Pelajaran (PTS / PAS / PAT)"
+        description={`Periode Akademik: ${selectedTahun?.nama ?? ''} (${selectedTahun?.semester ?? ''}) — Jadwal ujian yang berstatus AKTIF akan otomatis tampil menggantikan jadwal reguler di aplikasi mobile siswa & guru.`}
+        maxWidth="xl"
       >
-        <div className="space-y-4 py-2">
-          <Select
-            label="Pilih Tahun Ajaran Sumber"
-            value={sumberTahunId}
-            onChange={(e) => setSumberTahunId(e.target.value)}
-            options={(Array.isArray(tahunList) ? tahunList : [])
-              .filter((t) => t.id !== selectedTahunId)
-              .map((t) => ({
-                label: `${t?.nama ?? ''} ${t?.semester ?? ''}`,
-                value: t?.id ?? '',
-              }))}
-          />
+        <div className="space-y-4 py-1">
+          {/* TAB SWITCHER DI DALAM MODAL */}
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setExamActiveTab('list');
+                  setSelectedExamDetail(null);
+                }}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+                  examActiveTab === 'list'
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'bg-surface-muted text-foreground-muted hover:text-foreground',
+                )}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Daftar & Status Ujian ({examList.length})</span>
+              </button>
 
-          <div className="p-3 bg-surface-muted border border-border rounded-lg text-xs text-foreground-muted space-y-1">
-            <p className="font-medium text-foreground">Perhatian:</p>
-            <p>
-              Seluruh jadwal pelajaran dari tahun ajaran sumber akan disalin ke tahun ajaran tujuan
-              untuk seluruh kelas yang cocok.
-            </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setExamActiveTab('create');
+                  setSelectedExamDetail(null);
+                }}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+                  examActiveTab === 'create'
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'bg-surface-muted text-foreground-muted hover:text-foreground',
+                )}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Buat Jadwal Ujian Baru</span>
+              </button>
+
+              {examPreviewResult && (
+                <button
+                  type="button"
+                  onClick={() => setExamActiveTab('preview')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+                    examActiveTab === 'preview'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'bg-surface-muted text-foreground-muted hover:text-foreground',
+                  )}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Pratinjau ({examPreviewResult.total_items} Sesi)</span>
+                </button>
+              )}
+            </div>
+
+            {examList.some((e: any) => e.is_active) && (
+              <span className="text-[11px] font-semibold text-warning flex items-center gap-1 bg-warning-light px-2.5 py-1 rounded-md border border-warning/30">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Ada 1 Ujian Sedang Aktif di Mobile</span>
+              </span>
+            )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsDuplicateModalOpen(false)}
-              disabled={duplicateMutation.isPending}
+          {/* ================================================================= */}
+          {/* TAB 1: DAFTAR & STATUS JADWAL UJIAN                               */}
+          {/* ================================================================= */}
+          {examActiveTab === 'list' && (
+            <div className="space-y-3">
+              {isExamsLoading ? (
+                <div className="p-8 text-center text-xs text-foreground-muted">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
+                  <span>Memuat daftar jadwal ujian...</span>
+                </div>
+              ) : examList.length === 0 ? (
+                <div className="border border-dashed border-border rounded-xl p-8 text-center space-y-3 bg-surface-muted/30">
+                  <FileSpreadsheet className="w-10 h-10 text-foreground-muted/60 mx-auto" />
+                  <div>
+                    <p className="font-bold text-sm text-foreground">Belum Ada Jadwal Ujian</p>
+                    <p className="text-xs text-foreground-muted mt-1">
+                      Buat jadwal ujian untuk semester ini (PTS, PAS, PAT, atau Ujian Sekolah) dan aktifkan agar muncul di mobile.
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setExamActiveTab('create')}
+                    className="gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Buat Jadwal Ujian Sekarang</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {examList.map((exam: any) => {
+                    const isActive = Boolean(exam.is_active);
+
+                    return (
+                      <div
+                        key={exam.id}
+                        className={cn(
+                          'rounded-xl border p-4 transition-all',
+                          isActive
+                            ? 'bg-warning-light/20 border-warning/50 ring-1 ring-warning/30'
+                            : 'bg-surface border-border hover:border-border/80',
+                        )}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-sm text-foreground">
+                                {exam.nama_ujian}
+                              </h4>
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-surface border border-border text-foreground">
+                                {exam.jenis}
+                              </span>
+                              {isActive ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-success text-white">
+                                  AKTIF DI MOBILE
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border/60">
+                                  NONAKTIF (DRAF)
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-foreground-muted pt-1">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3.5 h-3.5 text-primary" />
+                                <span>
+                                  {exam.tanggal_mulai} s.d. {exam.tanggal_selesai}
+                                </span>
+                              </span>
+                              <span>•</span>
+                              <span>
+                                Total: <strong>{exam.total_items} Sesi Ujian</strong> ({exam.total_kelas} Rombel)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* AKSI TOGGLE AKTIVASI & HAPUS */}
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            <Button
+                              variant={isActive ? 'outline' : 'primary'}
+                              size="sm"
+                              onClick={() => {
+                                toggleExamStatusMutation.mutate({
+                                  id: exam.id,
+                                  is_active: !isActive,
+                                });
+                              }}
+                              disabled={toggleExamStatusMutation.isPending}
+                              className="text-xs h-8 gap-1.5"
+                            >
+                              {isActive ? (
+                                <>
+                                  <ToggleRight className="w-4 h-4 text-warning" />
+                                  <span>Nonaktifkan</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ToggleLeft className="w-4 h-4 text-white" />
+                                  <span>Aktifkan di Mobile</span>
+                                </>
+                              )}
+                            </Button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Hapus jadwal ujian "${exam.nama_ujian}"?`)) {
+                                  deleteExamMutation.mutate(exam.id);
+                                }
+                              }}
+                              disabled={deleteExamMutation.isPending}
+                              className="text-foreground-muted hover:text-danger p-1.5 rounded-lg hover:bg-danger-light transition-colors"
+                              title="Hapus Jadwal Ujian"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================================================================= */}
+          {/* TAB 2: FORM BUAT JADWAL UJIAN BARU                                */}
+          {/* ================================================================= */}
+          {examActiveTab === 'create' && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                generateExamPreviewMutation.mutate();
+              }}
+              className="space-y-4"
             >
-              Batal
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => duplicateMutation.mutate()}
-              isLoading={duplicateMutation.isPending}
-              disabled={!sumberTahunId}
-            >
-              Mulai Duplikasi
-            </Button>
-          </div>
+              {/* Presets Ujian Populer */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  Pilih Format Ujian Sekolah:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'PTS Ganjil', jenis: 'PTS', title: 'Penilaian Tengah Semester (PTS) Ganjil' },
+                    { label: 'PAS Ganjil', jenis: 'PAS', title: 'Penilaian Akhir Semester (PAS) Ganjil' },
+                    { label: 'PTS Genap', jenis: 'PTS', title: 'Penilaian Tengah Semester (PTS) Genap' },
+                    { label: 'PAT / PAS Genap', jenis: 'PAT', title: 'Penilaian Akhir Tahun (PAT) Genap' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        setExamJenis(preset.jenis);
+                        setExamNama(`${preset.title} ${selectedTahun?.nama ?? ''}`);
+                      }}
+                      className={cn(
+                        'p-2 rounded-lg border text-left text-xs font-medium transition-all',
+                        examNama.includes(preset.label)
+                          ? 'border-primary bg-primary-light text-primary font-bold shadow-xs'
+                          : 'border-border bg-surface text-foreground hover:bg-surface-muted',
+                      )}
+                    >
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nama & Jenis Ujian */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Nama Ujian"
+                    value={examNama}
+                    onChange={(e) => setExamNama(e.target.value)}
+                    placeholder="Contoh: Penilaian Tengah Semester (PTS) Ganjil 2026/2027"
+                    required
+                  />
+                </div>
+                <div>
+                  <Select
+                    label="Jenis Evaluasi"
+                    value={examJenis}
+                    onChange={(e) => setExamJenis(e.target.value)}
+                    options={[
+                      { label: 'PTS (Tengah Semester)', value: 'PTS' },
+                      { label: 'PAS (Akhir Semester)', value: 'PAS' },
+                      { label: 'PAT (Kenaikan Kelas)', value: 'PAT' },
+                      { label: 'Ujian Sekolah (US)', value: 'US' },
+                    ]}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Tanggal Mulai & Tanggal Selesai */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Tanggal Mulai Ujian"
+                  type="date"
+                  value={examTanggalMulai}
+                  onChange={(e) => setExamTanggalMulai(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Tanggal Selesai Ujian"
+                  type="date"
+                  value={examTanggalSelesai}
+                  onChange={(e) => setExamTanggalSelesai(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Sesi Ujian Harian */}
+              <div className="p-3.5 bg-surface-muted/60 border border-border rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-primary" />
+                    <span>Slot Waktu Sesi Ujian Harian</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExamSesiPerHari(1)}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-xs font-medium border',
+                        examSesiPerHari === 1
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-surface text-foreground-muted border-border',
+                      )}
+                    >
+                      1 Sesi/Hari
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExamSesiPerHari(2)}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-xs font-medium border',
+                        examSesiPerHari === 2
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-surface text-foreground-muted border-border',
+                      )}
+                    >
+                      2 Sesi/Hari
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <Input
+                    label="Sesi 1 Mulai"
+                    type="time"
+                    value={examJamSesi1Mulai}
+                    onChange={(e) => setExamJamSesi1Mulai(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Sesi 1 Selesai"
+                    type="time"
+                    value={examJamSesi1Selesai}
+                    onChange={(e) => setExamJamSesi1Selesai(e.target.value)}
+                    required
+                  />
+                  {examSesiPerHari >= 2 && (
+                    <>
+                      <Input
+                        label="Sesi 2 Mulai"
+                        type="time"
+                        value={examJamSesi2Mulai}
+                        onChange={(e) => setExamJamSesi2Mulai(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Sesi 2 Selesai"
+                        type="time"
+                        value={examJamSesi2Selesai}
+                        onChange={(e) => setExamJamSesi2Selesai(e.target.value)}
+                        required
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* OPSI AKTIFKAN / NONAKTIFKAN KE MOBILE */}
+              <div className="p-3.5 rounded-xl border border-warning/40 bg-warning-light/30 flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="examIsActiveCheckbox"
+                  checked={examIsActive}
+                  onChange={(e) => setExamIsActive(e.target.checked)}
+                  className="mt-0.5 rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                />
+                <label
+                  htmlFor="examIsActiveCheckbox"
+                  className="text-xs text-foreground cursor-pointer space-y-0.5 select-none"
+                >
+                  <span className="font-bold block text-foreground">
+                    Aktifkan Jadwal Ujian Ini (Tampilkan Langsung di Aplikasi Mobile)
+                  </span>
+                  <span className="text-foreground-muted block text-[11px] leading-relaxed">
+                    Jika dicentang, aplikasi mobile siswa dan guru akan langsung menampilkan jadwal ujian ini beserta ruangan dan pengawas. Jika tidak dicentang, jadwal akan disimpan sebagai draf nonaktif.
+                  </span>
+                </label>
+              </div>
+
+              {/* Tombol Aksi Form */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setExamActiveTab('list')}
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  isLoading={generateExamPreviewMutation.isPending}
+                  className="gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Generate & Pratinjau Jadwal</span>
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* ================================================================= */}
+          {/* TAB 3: PRATINJAU HASIL GENERATE JADWAL UJIAN                      */}
+          {/* ================================================================= */}
+          {examActiveTab === 'preview' && examPreviewResult && (
+            <div className="space-y-4">
+              {/* Ringkasan Parameter */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-3 rounded-lg bg-surface border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Nama Ujian:</span>
+                  <p className="font-bold text-foreground truncate">{examPreviewResult.nama_ujian}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-surface border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Rentang Waktu:</span>
+                  <p className="font-bold text-primary">
+                    {examPreviewResult.tanggal_mulai} s.d {examPreviewResult.tanggal_selesai}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-surface border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Cakupan Kelas:</span>
+                  <p className="font-bold text-foreground">
+                    {examPreviewResult.total_kelas} Rombel ({examPreviewResult.total_items} Sesi)
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-surface border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Status Penerapan:</span>
+                  <p className={cn('font-bold', examIsActive ? 'text-warning' : 'text-foreground-muted')}>
+                    {examIsActive ? 'Aktif di Mobile' : 'Disimpan sebagai Draf'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabel Pratinjau Sesi */}
+              <div className="max-h-64 overflow-y-auto border border-border rounded-xl">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">No</TableHead>
+                      <TableHead className="w-28">Tanggal & Jam</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Kelas Target</TableHead>
+                      <TableHead>Ruang Ujian</TableHead>
+                      <TableHead>Pengawas Ujian</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(examPreviewResult.items || []).slice(0, 50).map((slot: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-foreground-muted text-xs">{idx + 1}</TableCell>
+                        <TableCell>
+                          <div className="text-xs font-semibold text-foreground">{slot.tanggal}</div>
+                          <div className="font-mono text-[11px] text-primary">{slot.jam_mulai} - {slot.jam_selesai}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-xs font-bold text-foreground">{slot.mapel_nama}</div>
+                          <div className="text-[10px] font-mono text-foreground-muted">{slot.mapel_kode}</div>
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-foreground">{slot.kelas_nama}</TableCell>
+                        <TableCell className="text-xs font-mono text-foreground">{slot.ruangan}</TableCell>
+                        <TableCell className="text-xs text-foreground-muted">{slot.guru_nama}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Checkbox Pilihan Opsi Aktivasi */}
+              <div className="p-3 bg-surface-muted/50 border border-border rounded-lg flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="previewIsActive"
+                    checked={examIsActive}
+                    onChange={(e) => setExamIsActive(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                  />
+                  <label htmlFor="previewIsActive" className="cursor-pointer font-semibold text-foreground">
+                    Aktifkan dan tampilkan di aplikasi mobile sekarang
+                  </label>
+                </div>
+                <span className="text-[11px] text-foreground-muted">
+                  Menampilkan 50 dari {examPreviewResult.total_items} sesi
+                </span>
+              </div>
+
+              {/* Tombol Simpan */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setExamActiveTab('create')}
+                  disabled={createExamMutation.isPending}
+                >
+                  Ubah Parameter
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => createExamMutation.mutate()}
+                  isLoading={createExamMutation.isPending}
+                  className="gap-2 font-bold px-5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Simpan & Terapkan Jadwal Ujian</span>
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Dialog>
     </div>
