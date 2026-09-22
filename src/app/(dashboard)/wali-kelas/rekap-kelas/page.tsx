@@ -20,22 +20,27 @@ export default function RekapKelasPage() {
   const [selectedTanggal, setSelectedTanggal] = useState<string>(todayStr);
   const [selectedKelasId, setSelectedKelasId] = useState<string>('');
 
-  // Ambil daftar kelas
-  const { data: kelasList } = useQuery({
-    queryKey: ['kelas-list'],
+  // Ambil daftar kelas yang diampu atau diwalikan oleh guru
+  const { data: kelasList = [], isLoading: isLoadingKelas } = useQuery<Kelas[]>({
+    queryKey: ['kelas-list-rekap', user?.role],
     queryFn: async () => {
-      const res = await api.get('/master/kelas');
+      const res = await api.get('/laporan/kelas-list');
       const data = res.data?.data ?? res.data;
-      return (Array.isArray(data) ? data : []) as Kelas[];
+      return Array.isArray(data) ? data : [];
     },
+    enabled: !!user,
   });
 
-  // Default ke kelas yang diwalikan jika guru wali kelas
+  // Default ke kelas yang diwalikan jika guru wali kelas, atau kelas pertama yang diampu
   React.useEffect(() => {
-    if (kelasList && kelasList.length > 0 && !selectedKelasId) {
+    if (Array.isArray(kelasList) && kelasList.length > 0 && !selectedKelasId) {
       const waliKelasAssignment = user?.penugasan_wali_kelas?.[0];
-      if (waliKelasAssignment) {
-        setSelectedKelasId(waliKelasAssignment.kelas.id);
+      const matchWali = waliKelasAssignment
+        ? kelasList.find((k) => k.id === waliKelasAssignment.kelas.id)
+        : null;
+
+      if (matchWali) {
+        setSelectedKelasId(matchWali.id);
       } else {
         setSelectedKelasId(kelasList[0].id);
       }
@@ -57,7 +62,7 @@ export default function RekapKelasPage() {
     <div className="space-y-6">
       <PageHeader
         title="Rekap Kehadiran Harian Kelas"
-        description="Pantau kehadiran seluruh siswa per mata pelajaran pada tanggal yang dipilih"
+        description="Pantau kehadiran seluruh siswa per mata pelajaran pada kelas-kelas yang Anda ampu"
       />
 
       {/* Filter Tanggal & Kelas */}
@@ -65,13 +70,20 @@ export default function RekapKelasPage() {
         <CardContent className="p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
-              label="Pilih Rombongan Belajar / Kelas"
+              searchable
+              searchPlaceholder="Cari rombel / kelas..."
+              label="Pilih Rombongan Belajar / Kelas yang Diampu"
               value={selectedKelasId}
               onChange={(e) => setSelectedKelasId(e.target.value)}
-              options={(kelasList || []).map((k) => ({
-                label: k.nama_lengkap || `Kelas ${k.tingkat} ${k.nama_rombel}`,
-                value: k.id,
-              }))}
+              disabled={isLoadingKelas || kelasList.length === 0}
+              options={
+                kelasList.length > 0
+                  ? (kelasList || []).map((k) => ({
+                      label: k.nama_lengkap || `Kelas ${k.tingkat} ${k.nama_rombel}`,
+                      value: k.id,
+                    }))
+                  : [{ label: '-- Tidak ada kelas yang diampu --', value: '' }]
+              }
             />
 
             <Input
@@ -83,6 +95,7 @@ export default function RekapKelasPage() {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Hasil Rekap Sesi Harian */}
       {selectedKelasId && (

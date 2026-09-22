@@ -66,6 +66,7 @@ export function Sidebar() {
         { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
       ],
     },
+
     {
       title: 'Sistem & Pengaturan',
       items: [
@@ -93,10 +94,12 @@ export function Sidebar() {
     {
       title: 'Laporan',
       items: [
-        { href: '/laporan/mapel', label: 'Laporan Mata Pelajaran', icon: <FileSpreadsheet className="w-4 h-4" /> },
+        { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
+        { href: '/laporan/mapel', label: 'Laporan Mata Pelajaran', icon: <BookOpen className="w-4 h-4" /> },
       ],
     },
   ];
+
 
   // Menu Tambahan Wali Kelas
   const waliKelasGroups: NavGroup[] = [

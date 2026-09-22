@@ -94,6 +94,8 @@ export default function LaporanMapelPage() {
         <CardContent className="p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
+              searchable
+              searchPlaceholder="Cari mata pelajaran..."
               label="Pilih Mata Pelajaran"
               value={selectedMapelId}
               onChange={(e) => setSelectedMapelId(e.target.value)}
@@ -104,6 +106,8 @@ export default function LaporanMapelPage() {
             />
 
             <Select
+              searchable
+              searchPlaceholder="Cari tahun ajaran..."
               label="Periode Tahun Ajaran"
               value={selectedTahunId}
               onChange={(e) => setSelectedTahunId(e.target.value)}
@@ -112,6 +116,7 @@ export default function LaporanMapelPage() {
                 value: t.id,
               }))}
             />
+
           </div>
         </CardContent>
       </Card>
