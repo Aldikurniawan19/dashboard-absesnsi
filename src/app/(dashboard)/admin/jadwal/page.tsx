@@ -63,6 +63,40 @@ function isTimeOverlapping(startA: string, endA: string, startB: string, endB: s
   return startA < endB && endA > startB;
 }
 
+/**
+ * Menghitung otomatis tanggal selesai ujian agar mencakup seluruh mata pelajaran
+ * berdasarkan jumlah mata pelajaran terdaftar dan sesi ujian per hari (Senin-Sabtu, Minggu libur).
+ */
+function calculateExamEndDate(startDateStr: string, sesiPerHari: number, totalMapel: number): string {
+  if (!startDateStr) return '';
+  const parts = startDateStr.split('-');
+  if (parts.length !== 3) return '';
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const cur = new Date(y, m, d);
+  if (isNaN(cur.getTime())) return '';
+
+  const mapelCount = totalMapel > 0 ? totalMapel : 12;
+  const neededDays = Math.max(1, Math.ceil(mapelCount / Math.max(1, sesiPerHari)));
+
+  let effectiveDaysCount = 0;
+  while (effectiveDaysCount < neededDays) {
+    if (cur.getDay() !== 0) { // Bukan hari Minggu (0)
+      effectiveDaysCount++;
+      if (effectiveDaysCount === neededDays) {
+        break;
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  const yyyy = cur.getFullYear();
+  const mm = String(cur.getMonth() + 1).padStart(2, '0');
+  const dd = String(cur.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function AdminJadwalPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -1381,13 +1415,13 @@ export default function AdminJadwalPage() {
           setIsExamModalOpen(false);
           setSelectedExamDetail(null);
         }}
-        title="Jadwal Ujian Pelajaran (PTS / PAS / PAT)"
-        description={`Periode Akademik: ${selectedTahun?.nama ?? ''} (${selectedTahun?.semester ?? ''}) — Jadwal ujian yang berstatus AKTIF akan otomatis tampil menggantikan jadwal reguler di aplikasi mobile siswa & guru.`}
-        maxWidth="xl"
+        title="Jadwal Ujian Pelajaran"
+        description={`Periode Akademik: ${selectedTahun?.nama ?? ''} (${selectedTahun?.semester ?? ''}) — Kelola jadwal ujian untuk ditampilkan di aplikasi mobile.`}
+        maxWidth="full"
       >
-        <div className="space-y-4 py-1">
-          {/* TAB SWITCHER DI DALAM MODAL */}
-          <div className="flex items-center justify-between border-b border-border pb-3">
+        <div className="space-y-5 max-h-[70vh] overflow-y-auto -mr-2 pr-2">
+          {/* TAB NAVIGATION */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1396,14 +1430,14 @@ export default function AdminJadwalPage() {
                   setSelectedExamDetail(null);
                 }}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+                  'px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2',
                   examActiveTab === 'list'
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-surface-muted text-foreground-muted hover:text-foreground',
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-surface-muted text-foreground-muted hover:text-foreground hover:bg-surface-muted/80',
                 )}
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Daftar & Status Ujian ({examList.length})</span>
+                <Layers className="w-4 h-4" />
+                <span>Daftar Ujian ({examList.length})</span>
               </button>
 
               <button
@@ -1413,14 +1447,14 @@ export default function AdminJadwalPage() {
                   setSelectedExamDetail(null);
                 }}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+                  'px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2',
                   examActiveTab === 'create'
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-surface-muted text-foreground-muted hover:text-foreground',
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-surface-muted text-foreground-muted hover:text-foreground hover:bg-surface-muted/80',
                 )}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Buat Jadwal Ujian Baru</span>
+                <Plus className="w-4 h-4" />
+                <span>Buat Baru</span>
               </button>
 
               {examPreviewResult && (
@@ -1428,22 +1462,22 @@ export default function AdminJadwalPage() {
                   type="button"
                   onClick={() => setExamActiveTab('preview')}
                   className={cn(
-                    'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+                    'px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2',
                     examActiveTab === 'preview'
-                      ? 'bg-primary text-white shadow-xs'
-                      : 'bg-surface-muted text-foreground-muted hover:text-foreground',
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-surface-muted text-foreground-muted hover:text-foreground hover:bg-surface-muted/80',
                   )}
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Pratinjau ({examPreviewResult.total_items} Sesi)</span>
+                  <Eye className="w-4 h-4" />
+                  <span>Pratinjau ({examPreviewResult.total_items})</span>
                 </button>
               )}
             </div>
 
             {examList.some((e: any) => e.is_active) && (
-              <span className="text-[11px] font-semibold text-warning flex items-center gap-1 bg-warning-light px-2.5 py-1 rounded-md border border-warning/30">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Ada 1 Ujian Sedang Aktif di Mobile</span>
+              <span className="text-xs font-semibold text-warning flex items-center gap-1.5 bg-warning-light px-3 py-1.5 rounded-lg border border-warning/30">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Ada ujian aktif di mobile</span>
               </span>
             )}
           </div>
@@ -1452,33 +1486,32 @@ export default function AdminJadwalPage() {
           {/* TAB 1: DAFTAR & STATUS JADWAL UJIAN                               */}
           {/* ================================================================= */}
           {examActiveTab === 'list' && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {isExamsLoading ? (
-                <div className="p-8 text-center text-xs text-foreground-muted">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary" />
+                <div className="p-12 text-center text-sm text-foreground-muted">
+                  <Loader2 className="w-7 h-7 animate-spin mx-auto mb-3 text-primary" />
                   <span>Memuat daftar jadwal ujian...</span>
                 </div>
               ) : examList.length === 0 ? (
-                <div className="border border-dashed border-border rounded-xl p-8 text-center space-y-3 bg-surface-muted/30">
-                  <FileSpreadsheet className="w-10 h-10 text-foreground-muted/60 mx-auto" />
+                <div className="border border-dashed border-border rounded-xl p-12 text-center space-y-4 bg-surface-muted/30">
+                  <FileSpreadsheet className="w-12 h-12 text-foreground-muted/60 mx-auto" />
                   <div>
-                    <p className="font-bold text-sm text-foreground">Belum Ada Jadwal Ujian</p>
-                    <p className="text-xs text-foreground-muted mt-1">
+                    <p className="font-bold text-foreground">Belum Ada Jadwal Ujian</p>
+                    <p className="text-sm text-foreground-muted mt-1.5 max-w-md mx-auto">
                       Buat jadwal ujian untuk semester ini (PTS, PAS, PAT, atau Ujian Sekolah) dan aktifkan agar muncul di mobile.
                     </p>
                   </div>
                   <Button
                     variant="primary"
-                    size="sm"
                     onClick={() => setExamActiveTab('create')}
-                    className="gap-1.5"
+                    className="gap-2"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4" />
                     <span>Buat Jadwal Ujian Sekarang</span>
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                <div className="space-y-3">
                   {examList.map((exam: any) => {
                     const isActive = Boolean(exam.is_active);
 
@@ -1486,40 +1519,40 @@ export default function AdminJadwalPage() {
                       <div
                         key={exam.id}
                         className={cn(
-                          'rounded-xl border p-4 transition-all',
+                          'rounded-xl border p-5 transition-all',
                           isActive
                             ? 'bg-warning-light/20 border-warning/50 ring-1 ring-warning/30'
                             : 'bg-surface border-border hover:border-border/80',
                         )}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-sm text-foreground">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="space-y-2 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-foreground">
                                 {exam.nama_ujian}
                               </h4>
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-surface border border-border text-foreground">
+                              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-surface border border-border text-foreground">
                                 {exam.jenis}
                               </span>
                               {isActive ? (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-success text-white">
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded bg-success text-white">
                                   AKTIF DI MOBILE
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border/60">
+                                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border/60">
                                   NONAKTIF (DRAF)
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-foreground-muted pt-1">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3.5 h-3.5 text-primary" />
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-foreground-muted">
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="w-4 h-4 text-primary" />
                                 <span>
                                   {exam.tanggal_mulai} s.d. {exam.tanggal_selesai}
                                 </span>
                               </span>
-                              <span>•</span>
+                              <span className="text-border">|</span>
                               <span>
                                 Total: <strong>{exam.total_items} Sesi Ujian</strong> ({exam.total_kelas} Rombel)
                               </span>
@@ -1527,7 +1560,7 @@ export default function AdminJadwalPage() {
                           </div>
 
                           {/* AKSI TOGGLE AKTIVASI & HAPUS */}
-                          <div className="flex items-center gap-2 self-end sm:self-center">
+                          <div className="flex items-center gap-2 shrink-0">
                             <Button
                               variant={isActive ? 'outline' : 'primary'}
                               size="sm"
@@ -1538,7 +1571,7 @@ export default function AdminJadwalPage() {
                                 });
                               }}
                               disabled={toggleExamStatusMutation.isPending}
-                              className="text-xs h-8 gap-1.5"
+                              className="text-xs gap-1.5"
                             >
                               {isActive ? (
                                 <>
@@ -1561,7 +1594,7 @@ export default function AdminJadwalPage() {
                                 }
                               }}
                               disabled={deleteExamMutation.isPending}
-                              className="text-foreground-muted hover:text-danger p-1.5 rounded-lg hover:bg-danger-light transition-colors"
+                              className="text-foreground-muted hover:text-danger p-2 rounded-lg hover:bg-danger-light transition-colors"
                               title="Hapus Jadwal Ujian"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1585,14 +1618,14 @@ export default function AdminJadwalPage() {
                 e.preventDefault();
                 generateExamPreviewMutation.mutate();
               }}
-              className="space-y-4"
+              className="space-y-6"
             >
               {/* Presets Ujian Populer */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
-                  Pilih Format Ujian Sekolah:
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold text-foreground">
+                  Format Ujian
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
                     { label: 'PTS Ganjil', jenis: 'PTS', title: 'Penilaian Tengah Semester (PTS) Ganjil' },
                     { label: 'PAS Ganjil', jenis: 'PAS', title: 'Penilaian Akhir Semester (PAS) Ganjil' },
@@ -1607,20 +1640,20 @@ export default function AdminJadwalPage() {
                         setExamNama(`${preset.title} ${selectedTahun?.nama ?? ''}`);
                       }}
                       className={cn(
-                        'p-2 rounded-lg border text-left text-xs font-medium transition-all',
+                        'p-3 rounded-xl border text-left text-sm font-medium transition-all',
                         examNama.includes(preset.label)
-                          ? 'border-primary bg-primary-light text-primary font-bold shadow-xs'
+                          ? 'border-primary bg-primary-light text-primary font-bold shadow-sm'
                           : 'border-border bg-surface text-foreground hover:bg-surface-muted',
                       )}
                     >
-                      <span>{preset.label}</span>
+                      {preset.label}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Nama & Jenis Ujian */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
                   <Input
                     label="Nama Ujian"
@@ -1647,7 +1680,7 @@ export default function AdminJadwalPage() {
               </div>
 
               {/* Tanggal Mulai & Tanggal Selesai */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Tanggal Mulai Ujian"
                   type="date"
@@ -1665,78 +1698,86 @@ export default function AdminJadwalPage() {
               </div>
 
               {/* Sesi Ujian Harian */}
-              <div className="p-3.5 bg-surface-muted/60 border border-border rounded-xl space-y-3">
+              <div className="p-5 bg-surface-muted/60 border border-border rounded-xl space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-primary" />
-                    <span>Slot Waktu Sesi Ujian Harian</span>
+                  <span className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span>Slot Waktu Sesi Ujian</span>
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setExamSesiPerHari(1)}
                       className={cn(
-                        'px-2 py-0.5 rounded text-xs font-medium border',
+                        'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
                         examSesiPerHari === 1
                           ? 'bg-primary text-white border-primary'
-                          : 'bg-surface text-foreground-muted border-border',
+                          : 'bg-surface text-foreground-muted border-border hover:bg-surface-muted',
                       )}
                     >
-                      1 Sesi/Hari
+                      1 Sesi / Hari
                     </button>
                     <button
                       type="button"
                       onClick={() => setExamSesiPerHari(2)}
                       className={cn(
-                        'px-2 py-0.5 rounded text-xs font-medium border',
+                        'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
                         examSesiPerHari === 2
                           ? 'bg-primary text-white border-primary'
-                          : 'bg-surface text-foreground-muted border-border',
+                          : 'bg-surface text-foreground-muted border-border hover:bg-surface-muted',
                       )}
                     >
-                      2 Sesi/Hari
+                      2 Sesi / Hari
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <Input
-                    label="Sesi 1 Mulai"
-                    type="time"
-                    value={examJamSesi1Mulai}
-                    onChange={(e) => setExamJamSesi1Mulai(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Sesi 1 Selesai"
-                    type="time"
-                    value={examJamSesi1Selesai}
-                    onChange={(e) => setExamJamSesi1Selesai(e.target.value)}
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-semibold text-foreground-muted">Sesi 1</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Mulai"
+                        type="time"
+                        value={examJamSesi1Mulai}
+                        onChange={(e) => setExamJamSesi1Mulai(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Selesai"
+                        type="time"
+                        value={examJamSesi1Selesai}
+                        onChange={(e) => setExamJamSesi1Selesai(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
                   {examSesiPerHari >= 2 && (
-                    <>
-                      <Input
-                        label="Sesi 2 Mulai"
-                        type="time"
-                        value={examJamSesi2Mulai}
-                        onChange={(e) => setExamJamSesi2Mulai(e.target.value)}
-                        required
-                      />
-                      <Input
-                        label="Sesi 2 Selesai"
-                        type="time"
-                        value={examJamSesi2Selesai}
-                        onChange={(e) => setExamJamSesi2Selesai(e.target.value)}
-                        required
-                      />
-                    </>
+                    <div className="space-y-2.5">
+                      <p className="text-xs font-semibold text-foreground-muted">Sesi 2</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Mulai"
+                          type="time"
+                          value={examJamSesi2Mulai}
+                          onChange={(e) => setExamJamSesi2Mulai(e.target.value)}
+                          required
+                        />
+                        <Input
+                          label="Selesai"
+                          type="time"
+                          value={examJamSesi2Selesai}
+                          onChange={(e) => setExamJamSesi2Selesai(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
 
               {/* OPSI AKTIFKAN / NONAKTIFKAN KE MOBILE */}
-              <div className="p-3.5 rounded-xl border border-warning/40 bg-warning-light/30 flex items-start gap-3">
+              <div className="p-4 rounded-xl border border-warning/40 bg-warning-light/30 flex items-start gap-3">
                 <input
                   type="checkbox"
                   id="examIsActiveCheckbox"
@@ -1746,19 +1787,19 @@ export default function AdminJadwalPage() {
                 />
                 <label
                   htmlFor="examIsActiveCheckbox"
-                  className="text-xs text-foreground cursor-pointer space-y-0.5 select-none"
+                  className="text-sm text-foreground cursor-pointer space-y-1 select-none"
                 >
                   <span className="font-bold block text-foreground">
-                    Aktifkan Jadwal Ujian Ini (Tampilkan Langsung di Aplikasi Mobile)
+                    Aktifkan Jadwal Ujian Ini
                   </span>
-                  <span className="text-foreground-muted block text-[11px] leading-relaxed">
-                    Jika dicentang, aplikasi mobile siswa dan guru akan langsung menampilkan jadwal ujian ini beserta ruangan dan pengawas. Jika tidak dicentang, jadwal akan disimpan sebagai draf nonaktif.
+                  <span className="text-foreground-muted block text-xs leading-relaxed">
+                    Jika dicentang, jadwal ujian ini langsung tampil di aplikasi mobile siswa dan guru. Jika tidak, jadwal disimpan sebagai draf nonaktif.
                   </span>
                 </label>
               </div>
 
               {/* Tombol Aksi Form */}
-              <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+              <div className="flex justify-end gap-3 pt-3 border-t border-border/50">
                 <Button
                   type="button"
                   variant="outline"
@@ -1773,7 +1814,7 @@ export default function AdminJadwalPage() {
                   className="gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Generate & Pratinjau Jadwal</span>
+                  <span>Generate Pratinjau</span>
                 </Button>
               </div>
             </form>
@@ -1783,40 +1824,40 @@ export default function AdminJadwalPage() {
           {/* TAB 3: PRATINJAU HASIL GENERATE JADWAL UJIAN                      */}
           {/* ================================================================= */}
           {examActiveTab === 'preview' && examPreviewResult && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* Ringkasan Parameter */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="p-3 rounded-lg bg-surface border border-border">
-                  <span className="text-[10px] text-foreground-muted block">Nama Ujian:</span>
-                  <p className="font-bold text-foreground truncate">{examPreviewResult.nama_ujian}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-4 rounded-xl bg-surface border border-border">
+                  <span className="text-xs text-foreground-muted block mb-1">Nama Ujian</span>
+                  <p className="font-bold text-sm text-foreground truncate">{examPreviewResult.nama_ujian}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-surface border border-border">
-                  <span className="text-[10px] text-foreground-muted block">Rentang Waktu:</span>
-                  <p className="font-bold text-primary">
+                <div className="p-4 rounded-xl bg-surface border border-border">
+                  <span className="text-xs text-foreground-muted block mb-1">Rentang Waktu</span>
+                  <p className="font-bold text-sm text-primary">
                     {examPreviewResult.tanggal_mulai} s.d {examPreviewResult.tanggal_selesai}
                   </p>
                 </div>
-                <div className="p-3 rounded-lg bg-surface border border-border">
-                  <span className="text-[10px] text-foreground-muted block">Cakupan Kelas:</span>
-                  <p className="font-bold text-foreground">
+                <div className="p-4 rounded-xl bg-surface border border-border">
+                  <span className="text-xs text-foreground-muted block mb-1">Cakupan Kelas</span>
+                  <p className="font-bold text-sm text-foreground">
                     {examPreviewResult.total_kelas} Rombel ({examPreviewResult.total_items} Sesi)
                   </p>
                 </div>
-                <div className="p-3 rounded-lg bg-surface border border-border">
-                  <span className="text-[10px] text-foreground-muted block">Status Penerapan:</span>
-                  <p className={cn('font-bold', examIsActive ? 'text-warning' : 'text-foreground-muted')}>
+                <div className="p-4 rounded-xl bg-surface border border-border">
+                  <span className="text-xs text-foreground-muted block mb-1">Status Penerapan</span>
+                  <p className={cn('font-bold text-sm', examIsActive ? 'text-warning' : 'text-foreground-muted')}>
                     {examIsActive ? 'Aktif di Mobile' : 'Disimpan sebagai Draf'}
                   </p>
                 </div>
               </div>
 
               {/* Tabel Pratinjau Sesi */}
-              <div className="max-h-64 overflow-y-auto border border-border rounded-xl">
+              <div className="max-h-80 overflow-y-auto border border-border rounded-xl">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10">No</TableHead>
-                      <TableHead className="w-28">Tanggal & Jam</TableHead>
+                      <TableHead className="w-12">No</TableHead>
+                      <TableHead className="w-36">Tanggal & Jam</TableHead>
                       <TableHead>Mata Pelajaran</TableHead>
                       <TableHead>Kelas Target</TableHead>
                       <TableHead>Ruang Ujian</TableHead>
@@ -1829,11 +1870,11 @@ export default function AdminJadwalPage() {
                         <TableCell className="text-foreground-muted text-xs">{idx + 1}</TableCell>
                         <TableCell>
                           <div className="text-xs font-semibold text-foreground">{slot.tanggal}</div>
-                          <div className="font-mono text-[11px] text-primary">{slot.jam_mulai} - {slot.jam_selesai}</div>
+                          <div className="font-mono text-xs text-primary">{slot.jam_mulai} - {slot.jam_selesai}</div>
                         </TableCell>
                         <TableCell>
                           <div className="text-xs font-bold text-foreground">{slot.mapel_nama}</div>
-                          <div className="text-[10px] font-mono text-foreground-muted">{slot.mapel_kode}</div>
+                          <div className="text-[11px] font-mono text-foreground-muted">{slot.mapel_kode}</div>
                         </TableCell>
                         <TableCell className="text-xs font-medium text-foreground">{slot.kelas_nama}</TableCell>
                         <TableCell className="text-xs font-mono text-foreground">{slot.ruangan}</TableCell>
@@ -1845,8 +1886,8 @@ export default function AdminJadwalPage() {
               </div>
 
               {/* Checkbox Pilihan Opsi Aktivasi */}
-              <div className="p-3 bg-surface-muted/50 border border-border rounded-lg flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
+              <div className="p-4 bg-surface-muted/50 border border-border rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
                   <input
                     type="checkbox"
                     id="previewIsActive"
@@ -1854,17 +1895,17 @@ export default function AdminJadwalPage() {
                     onChange={(e) => setExamIsActive(e.target.checked)}
                     className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
                   />
-                  <label htmlFor="previewIsActive" className="cursor-pointer font-semibold text-foreground">
+                  <label htmlFor="previewIsActive" className="cursor-pointer font-semibold text-sm text-foreground">
                     Aktifkan dan tampilkan di aplikasi mobile sekarang
                   </label>
                 </div>
-                <span className="text-[11px] text-foreground-muted">
+                <span className="text-xs text-foreground-muted">
                   Menampilkan 50 dari {examPreviewResult.total_items} sesi
                 </span>
               </div>
 
               {/* Tombol Simpan */}
-              <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+              <div className="flex justify-end gap-3 pt-3 border-t border-border/50">
                 <Button
                   type="button"
                   variant="outline"
@@ -1878,10 +1919,10 @@ export default function AdminJadwalPage() {
                   variant="primary"
                   onClick={() => createExamMutation.mutate()}
                   isLoading={createExamMutation.isPending}
-                  className="gap-2 font-bold px-5"
+                  className="gap-2 font-bold px-6"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Simpan & Terapkan Jadwal Ujian</span>
+                  <span>Simpan Jadwal Ujian</span>
                 </Button>
               </div>
             </div>
