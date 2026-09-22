@@ -555,14 +555,14 @@ export default function AdminJadwalPage() {
         tanggal_selesai: examPreviewResult.tanggal_selesai,
         is_active: examIsActive,
         items: (examPreviewResult.items || []).map((item: any) => ({
-          kelas_id: item.kelas_id,
-          mapel_id: item.mapel_id,
-          guru_id: item.guru_id || undefined,
-          tanggal: item.tanggal,
-          hari: item.hari,
-          jam_mulai: item.jam_mulai,
-          jam_selesai: item.jam_selesai,
-          ruangan: item.ruangan,
+          kelas_id: String(item.kelas_id),
+          mapel_id: String(item.mapel_id),
+          guru_id: item.guru_id ? String(item.guru_id) : undefined,
+          tanggal: String(item.tanggal),
+          hari: Number(item.hari) || 1,
+          jam_mulai: String(item.jam_mulai),
+          jam_selesai: String(item.jam_selesai),
+          ruangan: item.ruangan ? String(item.ruangan) : undefined,
         })),
       };
       const res = await api.post('/jadwal/ujian', payload);
@@ -580,7 +580,12 @@ export default function AdminJadwalPage() {
       );
     },
     onError: (err: any) => {
-      toast.error('Gagal menyimpan jadwal ujian', err?.response?.data?.message || 'Terjadi kesalahan sistem');
+      const serverMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Terjadi kesalahan sistem';
+      toast.error('Gagal menyimpan jadwal ujian', serverMsg);
     },
   });
 
