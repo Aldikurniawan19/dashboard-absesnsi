@@ -472,21 +472,11 @@ export default function AdminJadwalPage() {
       {/* HEADER UTAMA */}
       <PageHeader
         title="Jadwal Pelajaran"
-        description="Kelola jadwal mingguan per kelas dan pantau validasi bentrok guru dan kelas secara otomatis"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => router.push('/admin/jadwal/buat-otomatis')}
-              className="gap-1.5 border-primary/40 text-primary hover:bg-primary/5 font-semibold"
-            >
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span>Buat Jadwal Otomatis</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+              size="md"
               onClick={() => {
                 const draft = Array.isArray(tahunList)
                   ? tahunList.find((t) => t.id !== selectedTahunId)
@@ -494,19 +484,28 @@ export default function AdminJadwalPage() {
                 if (draft) setSumberTahunId(draft.id);
                 setIsDuplicateModalOpen(true);
               }}
-              className="gap-1.5"
+              className="gap-2"
             >
-              <Copy className="w-4 h-4 text-primary" />
+              <Copy className="w-4 h-4" />
               <span>Duplikasi Jadwal</span>
             </Button>
             <Button
-              variant="primary"
-              size="sm"
+              variant="outline"
+              size="md"
               onClick={() => handleOpenImport()}
-              className="gap-1.5"
+              className="gap-2"
             >
               <UploadCloud className="w-4 h-4" />
               <span>Impor Jadwal</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => router.push('/admin/jadwal/buat-otomatis')}
+              className="gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Buat Jadwal Otomatis</span>
             </Button>
           </div>
         }

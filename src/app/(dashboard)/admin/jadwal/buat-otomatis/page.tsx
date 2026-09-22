@@ -137,6 +137,9 @@ export default function BuatJadwalOtomatisPage() {
           kelas_id: s.kelas_id,
           guru_id: s.guru_id,
           mapel_id: s.mapel_id,
+          mapel_nama: s.mapel_nama,
+          mapel_kode: s.mapel_kode,
+          tahun_ajaran_id: previewResult.tahun_ajaran_id || s.tahun_ajaran_id,
           hari: s.hari,
           jam_mulai: s.jam_mulai,
           jam_selesai: s.jam_selesai,
@@ -188,9 +191,9 @@ export default function BuatJadwalOtomatisPage() {
         actions={
           <Button
             variant="outline"
-            size="sm"
+            size="md"
             onClick={() => router.push('/admin/jadwal')}
-            className="gap-1.5"
+            className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Kembali ke Jadwal</span>
