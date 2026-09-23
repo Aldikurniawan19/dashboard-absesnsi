@@ -104,6 +104,7 @@ export default function AdminJadwalUjianPage() {
 
   // State Filter & Paginasi untuk Detail Jadwal Ujian
   const [detailExamId, setDetailExamId] = useState<string | null>(null);
+  const [detailExamTitle, setDetailExamTitle] = useState<string>('');
   const [detailPage, setDetailPage] = useState<number>(1);
   const [detailLimit, setDetailLimit] = useState<number>(20);
   const [detailFilterKelas, setDetailFilterKelas] = useState<string>('ALL');
@@ -210,8 +211,9 @@ export default function AdminJadwalUjianPage() {
   }, [examTanggalMulai, examSesiPerHari, mapelList.length]);
 
   // Handler Buka Detail Ujian
-  const handleOpenDetail = (id: string) => {
+  const handleOpenDetail = (id: string, nama?: string) => {
     setDetailExamId(id);
+    setDetailExamTitle(nama || '');
     setDetailPage(1);
     setDetailFilterKelas('ALL');
     setDetailSearch('');
@@ -515,7 +517,7 @@ export default function AdminJadwalUjianPage() {
           </button>
         )}
 
-        {activeTab === 'detail' && detailData && (
+        {activeTab === 'detail' && (
           <button
             type="button"
             onClick={() => setActiveTab('detail')}
@@ -526,8 +528,12 @@ export default function AdminJadwalUjianPage() {
                 : 'border-transparent text-foreground-muted hover:text-foreground',
             )}
           >
-            <BookOpen className="w-4 h-4" />
-            <span>Detail: {detailData.nama_ujian}</span>
+            {isDetailLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            ) : (
+              <BookOpen className="w-4 h-4" />
+            )}
+            <span>Detail: {detailExamTitle || detailData?.nama_ujian || 'Jadwal Ujian'}</span>
           </button>
         )}
       </div>
@@ -619,7 +625,7 @@ export default function AdminJadwalUjianPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => handleOpenDetail(exam.id)}
+                          onClick={() => handleOpenDetail(exam.id, exam.nama_ujian)}
                           className="text-xs gap-1.5"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -1149,127 +1155,43 @@ export default function AdminJadwalUjianPage() {
       {/* ===================================================================== */}
       {/* TAB 4: DETAIL JADWAL UJIAN TERDAFTAR (PAGINASI & FILTER CEPAT)        */}
       {/* ===================================================================== */}
-      {activeTab === 'detail' && detailData && (
-        <div className="space-y-5">
-          <div className="p-5 rounded-2xl bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-foreground">
-                  {detailData.nama_ujian}
-                </h3>
-                {detailData.is_active ? (
-                  <Badge variant="warning" className="text-xs font-bold gap-1">
-                    <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
-                    <span>Aktif di Mobile</span>
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-xs text-foreground-muted">
-                    Draf / Nonaktif
-                  </Badge>
-                )}
-              </div>
-              <p className="text-xs text-foreground-muted">
-                Periode: {detailData.tanggal_mulai} s.d {detailData.tanggal_selesai} • Total {detailData.meta?.total || 0} Sesi Ujian Terjadwal
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant={detailData.is_active ? 'outline' : 'primary'}
-                onClick={() => {
-                  toggleExamStatusMutation.mutate(
-                    {
-                      id: detailData.id,
-                      is_active: !detailData.is_active,
-                    },
-                    {
-                      onSuccess: () => {
-                        refetchDetail();
-                      },
-                    },
-                  );
-                }}
-                isLoading={toggleExamStatusMutation.isPending}
-                className="gap-1.5 text-xs font-semibold"
-              >
-                {detailData.is_active ? (
-                  <>
-                    <ToggleRight className="w-4 h-4 text-warning" />
-                    <span>Nonaktifkan</span>
-                  </>
-                ) : (
-                  <>
-                    <ToggleLeft className="w-4 h-4 text-white" />
-                    <span>Aktifkan di Mobile</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Filter & Pencarian Cepat */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
-            <div className="flex flex-wrap items-center gap-3 flex-1">
-              <div className="w-full sm:w-60">
-                <Select
-                  value={detailFilterKelas}
-                  onChange={(e) => {
-                    setDetailFilterKelas(e.target.value);
-                    setDetailPage(1);
-                  }}
-                  options={[
-                    { label: `Semua Kelas (${kelasList.length})`, value: 'ALL' },
-                    ...kelasList.map((k) => ({
-                      label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
-                      value: k.id,
-                    })),
-                  ]}
-                />
-              </div>
-
-              <div className="w-36">
-                <Select
-                  value={String(detailLimit)}
-                  onChange={(e) => {
-                    setDetailLimit(Number(e.target.value));
-                    setDetailPage(1);
-                  }}
-                  options={[
-                    { label: '10 / halaman', value: '10' },
-                    { label: '20 / halaman', value: '20' },
-                    { label: '50 / halaman', value: '50' },
-                    { label: '100 / halaman', value: '100' },
-                  ]}
-                />
-              </div>
-            </div>
-
-            {/* Kotak Pencarian */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-foreground-muted pointer-events-none" />
-              <Input
-                value={detailSearch}
-                onChange={(e) => {
-                  setDetailSearch(e.target.value);
-                  setDetailPage(1);
-                }}
-                placeholder="Cari mapel, guru, ruangan..."
-                className="pl-9"
-              />
-            </div>
-          </div>
-
-          {/* Tabel Detail Terpaginasi */}
-          <div className="border border-border rounded-xl bg-surface overflow-hidden">
-            {isDetailLoading ? (
-              <div className="p-4 space-y-3 animate-in fade-in-50 duration-200">
-                <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-36 rounded" />
-                    <Skeleton className="h-3 w-56 rounded" />
-                  </div>
-                  <Skeleton className="h-6 w-24 rounded-full" />
+      {activeTab === 'detail' && (
+        isDetailLoading ? (
+          <div className="space-y-5 animate-in fade-in-50 duration-200">
+            {/* Header Detail Card Skeleton */}
+            <div className="p-5 rounded-2xl bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-foreground">
+                    {detailExamTitle || 'Memuat Jadwal Ujian...'}
+                  </h3>
+                  <Skeleton className="h-5 w-24 rounded-full" />
                 </div>
+                <Skeleton className="h-3.5 w-72 rounded" />
+              </div>
+              <Skeleton className="h-8 w-32 rounded-lg" />
+            </div>
+
+            {/* Filter & Search Bar Skeleton */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                <Skeleton className="h-9 w-full sm:w-60 rounded-md" />
+                <Skeleton className="h-9 w-36 rounded-md" />
+              </div>
+              <Skeleton className="h-9 w-full sm:w-72 rounded-md" />
+            </div>
+
+            {/* Tabel Detail Skeleton */}
+            <div className="border border-border rounded-xl bg-surface overflow-hidden p-4 space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-40 rounded" />
+                  <Skeleton className="h-3 w-64 rounded" />
+                </div>
+                <Skeleton className="h-6 w-28 rounded-full" />
+              </div>
+
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1282,7 +1204,7 @@ export default function AdminJadwalUjianPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {Array.from({ length: 6 }).map((_, rIdx) => (
+                    {Array.from({ length: 8 }).map((_, rIdx) => (
                       <TableRow key={rIdx}>
                         <TableCell><Skeleton className="h-3.5 w-4 rounded" /></TableCell>
                         <TableCell>
@@ -1293,75 +1215,190 @@ export default function AdminJadwalUjianPage() {
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1.5">
-                            <Skeleton className="h-4 w-32 rounded" />
+                            <Skeleton className="h-4 w-36 rounded" />
                             <Skeleton className="h-3 w-12 rounded" />
                           </div>
                         </TableCell>
                         <TableCell><Skeleton className="h-3.5 w-24 rounded" /></TableCell>
-                        <TableCell><Skeleton className="h-3.5 w-14 rounded" /></TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-16 rounded" /></TableCell>
                         <TableCell><Skeleton className="h-3.5 w-28 rounded" /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-            ) : (detailData.items || []).length === 0 ? (
-              <div className="py-12 text-center text-foreground-muted">
-                <p className="text-xs font-semibold text-foreground">Tidak ada data sesi ujian</p>
-                <p className="text-xs text-foreground-muted mt-1">Coba sesuaikan filter kelas atau kata kunci pencarian</p>
+            </div>
+          </div>
+        ) : detailData ? (
+          <div className="space-y-5 animate-in fade-in-50 duration-200">
+            <div className="p-5 rounded-2xl bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-foreground">
+                    {detailData.nama_ujian}
+                  </h3>
+                  {detailData.is_active ? (
+                    <Badge variant="warning" className="text-xs font-bold gap-1">
+                      <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
+                      <span>Aktif di Mobile</span>
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-foreground-muted">
+                      Draf / Nonaktif
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-foreground-muted">
+                  Periode: {detailData.tanggal_mulai} s.d {detailData.tanggal_selesai} • Total {detailData.meta?.total || 0} Sesi Ujian Terjadwal
+                </p>
               </div>
-            ) : (
-              <div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">No</TableHead>
-                      <TableHead className="w-36">Tanggal & Jam</TableHead>
-                      <TableHead>Mata Pelajaran</TableHead>
-                      <TableHead>Kelas</TableHead>
-                      <TableHead>Ruangan</TableHead>
-                      <TableHead>Pengawas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(detailData.items || []).map((it: any, idx: number) => {
-                      const rowNum = (detailData.meta?.page - 1) * detailData.meta?.limit + idx + 1;
-                      return (
-                        <TableRow key={it.id || idx}>
-                          <TableCell className="text-foreground-muted text-xs">{rowNum}</TableCell>
-                          <TableCell>
-                            <div className="text-xs font-semibold text-foreground">{it.tanggal}</div>
-                            <div className="font-mono text-xs text-primary">{it.jam_mulai} - {it.jam_selesai}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-xs font-bold text-foreground">{it.mapel_nama}</div>
-                            <div className="text-[11px] font-mono text-foreground-muted">{it.mapel_kode}</div>
-                          </TableCell>
-                          <TableCell className="text-xs font-medium text-foreground">{it.kelas_nama}</TableCell>
-                          <TableCell className="text-xs font-mono text-foreground">{it.ruangan || '-'}</TableCell>
-                          <TableCell className="text-xs text-foreground-muted">{it.guru_nama || '-'}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
 
-                {/* Kontrol Navigasi Paginasi Standar */}
-                <div className="p-4 border-t border-border/60 bg-surface">
-                  <Pagination
-                    currentPage={detailData.meta?.page || detailPage}
-                    totalPages={detailData.meta?.totalPages || 1}
-                    totalItems={detailData.meta?.total || 0}
-                    pageSize={detailData.meta?.limit || detailLimit}
-                    onPageChange={(page) => setDetailPage(page)}
-                    itemLabel="sesi ujian"
-                    hideOnSinglePage={false}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={detailData.is_active ? 'outline' : 'primary'}
+                  onClick={() => {
+                    toggleExamStatusMutation.mutate(
+                      {
+                        id: detailData.id,
+                        is_active: !detailData.is_active,
+                      },
+                      {
+                        onSuccess: () => {
+                          refetchDetail();
+                        },
+                      },
+                    );
+                  }}
+                  isLoading={toggleExamStatusMutation.isPending}
+                  className="gap-1.5 text-xs font-semibold"
+                >
+                  {detailData.is_active ? (
+                    <>
+                      <ToggleRight className="w-4 h-4 text-warning" />
+                      <span>Nonaktifkan</span>
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="w-4 h-4 text-white" />
+                      <span>Aktifkan di Mobile</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter & Pencarian Cepat */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                <div className="w-full sm:w-60">
+                  <Select
+                    value={detailFilterKelas}
+                    onChange={(e) => {
+                      setDetailFilterKelas(e.target.value);
+                      setDetailPage(1);
+                    }}
+                    options={[
+                      { label: `Semua Kelas (${kelasList.length})`, value: 'ALL' },
+                      ...kelasList.map((k) => ({
+                        label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
+                        value: k.id,
+                      })),
+                    ]}
+                  />
+                </div>
+
+                <div className="w-36">
+                  <Select
+                    value={String(detailLimit)}
+                    onChange={(e) => {
+                      setDetailLimit(Number(e.target.value));
+                      setDetailPage(1);
+                    }}
+                    options={[
+                      { label: '10 / halaman', value: '10' },
+                      { label: '20 / halaman', value: '20' },
+                      { label: '50 / halaman', value: '50' },
+                      { label: '100 / halaman', value: '100' },
+                    ]}
                   />
                 </div>
               </div>
-            )}
+
+              {/* Kotak Pencarian */}
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-foreground-muted pointer-events-none" />
+                <Input
+                  value={detailSearch}
+                  onChange={(e) => {
+                    setDetailSearch(e.target.value);
+                    setDetailPage(1);
+                  }}
+                  placeholder="Cari mapel, guru, ruangan..."
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {/* Tabel Detail Terpaginasi */}
+            <div className="border border-border rounded-xl bg-surface overflow-hidden">
+              {(detailData.items || []).length === 0 ? (
+                <div className="py-12 text-center text-foreground-muted">
+                  <p className="text-xs font-semibold text-foreground">Tidak ada data sesi ujian</p>
+                  <p className="text-xs text-foreground-muted mt-1">Coba sesuaikan filter kelas atau kata kunci pencarian</p>
+                </div>
+              ) : (
+                <div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">No</TableHead>
+                        <TableHead className="w-36">Tanggal & Jam</TableHead>
+                        <TableHead>Mata Pelajaran</TableHead>
+                        <TableHead>Kelas</TableHead>
+                        <TableHead>Ruangan</TableHead>
+                        <TableHead>Pengawas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(detailData.items || []).map((it: any, idx: number) => {
+                        const rowNum = (detailData.meta?.page - 1) * detailData.meta?.limit + idx + 1;
+                        return (
+                          <TableRow key={it.id || idx}>
+                            <TableCell className="text-foreground-muted text-xs">{rowNum}</TableCell>
+                            <TableCell>
+                              <div className="text-xs font-semibold text-foreground">{it.tanggal}</div>
+                              <div className="font-mono text-xs text-primary">{it.jam_mulai} - {it.jam_selesai}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-xs font-bold text-foreground">{it.mapel_nama}</div>
+                              <div className="text-[11px] font-mono text-foreground-muted">{it.mapel_kode}</div>
+                            </TableCell>
+                            <TableCell className="text-xs font-medium text-foreground">{it.kelas_nama}</TableCell>
+                            <TableCell className="text-xs font-mono text-foreground">{it.ruangan || '-'}</TableCell>
+                            <TableCell className="text-xs text-foreground-muted">{it.guru_nama || '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+
+                  {/* Kontrol Navigasi Paginasi Standar */}
+                  <div className="p-4 border-t border-border/60 bg-surface">
+                    <Pagination
+                      currentPage={detailData.meta?.page || detailPage}
+                      totalPages={detailData.meta?.totalPages || 1}
+                      totalItems={detailData.meta?.total || 0}
+                      pageSize={detailData.meta?.limit || detailLimit}
+                      onPageChange={(page) => setDetailPage(page)}
+                      itemLabel="sesi ujian"
+                      hideOnSinglePage={false}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : null
       )}
 
       {/* MODAL KONFIRMASI HAPUS JADWAL UJIAN */}
