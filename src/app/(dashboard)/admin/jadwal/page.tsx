@@ -617,13 +617,21 @@ export default function AdminJadwalPage() {
       const res = await api.delete(`/jadwal/ujian/${id}`);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       refetchExams();
       if (selectedExamDetail) setSelectedExamDetail(null);
-      toast.success('Jadwal ujian berhasil dihapus');
+      toast.success(res?.message || 'Jadwal ujian berhasil dihapus');
     },
     onError: (err: any) => {
-      toast.error('Gagal menghapus jadwal ujian', err?.response?.data?.message || 'Terjadi kesalahan');
+      const serverMsg =
+        (typeof err?.response?.data === 'string' ? err.response.data : null) ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : err?.response?.data?.message) ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Gagal menghapus jadwal ujian';
+      toast.error('Gagal menghapus jadwal ujian', serverMsg);
     },
   });
 
@@ -1640,7 +1648,11 @@ export default function AdminJadwalPage() {
                               }}
                               disabled={deleteExamMutation.isPending}
                               className="text-foreground-muted hover:text-danger p-2 rounded-lg hover:bg-danger-light transition-colors"
-                              title="Hapus Jadwal Ujian"
+                              title={
+                                exam.is_active
+                                  ? 'Jadwal aktif (nonaktifkan terlebih dahulu untuk menghapus)'
+                                  : 'Hapus Jadwal Ujian'
+                              }
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -2067,28 +2079,40 @@ export default function AdminJadwalPage() {
         onClose={() => setExamToDelete(null)}
         title="Konfirmasi Hapus Jadwal Ujian"
         maxWidth="md"
-        isLoading={deleteExamMutation.isPending}
-        loadingMessage="Menghapus jadwal ujian..."
       >
         <div className="space-y-4">
-          <div className="flex items-start gap-3.5 p-4 rounded-xl border border-danger/20 bg-danger-light/30">
-            <div className="p-2 rounded-lg bg-danger text-white shrink-0">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-            <div className="space-y-1 text-sm">
-              <p className="font-bold text-foreground">
-                Apakah Anda yakin ingin menghapus jadwal ujian ini?
-              </p>
-              <p className="text-foreground-muted text-xs">
-                Jadwal <strong className="text-foreground">{examToDelete?.nama}</strong> beserta seluruh <strong>{examToDelete?.totalItems} sesi ujian</strong> akan dihapus permanen.
-              </p>
-              {examToDelete?.isActive && (
-                <p className="text-warning font-semibold text-xs mt-1">
-                  Perhatian: Jadwal ujian ini saat ini sedang aktif di aplikasi mobile siswa & guru.
+          {examToDelete?.isActive ? (
+            <div className="flex items-start gap-3.5 p-4 rounded-xl border border-warning/30 bg-warning-light/30">
+              <div className="p-2 rounded-lg bg-warning text-white shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-bold text-foreground">
+                  Jadwal Ujian Masih Aktif
                 </p>
-              )}
+                <p className="text-foreground-muted text-xs leading-relaxed">
+                  Jadwal <strong className="text-foreground">{examToDelete?.nama}</strong> saat ini sedang berstatus <strong>AKTIF</strong> dan tampil di aplikasi mobile siswa & guru.
+                </p>
+                <p className="text-warning-dark font-medium text-xs mt-1">
+                  Jadwal yang sedang aktif tidak dapat dihapus demi keamanan data absensi. Silakan nonaktifkan jadwal ini terlebih dahulu jika ingin menghapusnya.
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-start gap-3.5 p-4 rounded-xl border border-danger/20 bg-danger-light/30">
+              <div className="p-2 rounded-lg bg-danger text-white shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-bold text-foreground">
+                  Apakah Anda yakin ingin menghapus jadwal ujian ini?
+                </p>
+                <p className="text-foreground-muted text-xs">
+                  Jadwal <strong className="text-foreground">{examToDelete?.nama}</strong> beserta seluruh <strong>{examToDelete?.totalItems} sesi ujian</strong> akan dihapus permanen.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2.5 pt-2">
             <Button
@@ -2097,24 +2121,26 @@ export default function AdminJadwalPage() {
               onClick={() => setExamToDelete(null)}
               disabled={deleteExamMutation.isPending}
             >
-              Batal
+              {examToDelete?.isActive ? 'Tutup' : 'Batal'}
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                if (examToDelete) {
-                  deleteExamMutation.mutate(examToDelete.id, {
-                    onSettled: () => setExamToDelete(null),
-                  });
-                }
-              }}
-              isLoading={deleteExamMutation.isPending}
-              className="gap-2 font-bold"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Hapus Jadwal Ujian</span>
-            </Button>
+            {!examToDelete?.isActive && (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => {
+                  if (examToDelete) {
+                    deleteExamMutation.mutate(examToDelete.id, {
+                      onSettled: () => setExamToDelete(null),
+                    });
+                  }
+                }}
+                isLoading={deleteExamMutation.isPending}
+                className="gap-2 font-bold"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Hapus Jadwal Ujian</span>
+              </Button>
+            )}
           </div>
         </div>
       </Dialog>
