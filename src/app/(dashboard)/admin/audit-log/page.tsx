@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/layout/page-header';
@@ -33,7 +33,24 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
+  FolderOpen,
+  ArrowLeft,
 } from 'lucide-react';
+
+interface LoadedArchive {
+  filename: string;
+  cert: any;
+  logs: AuditLogItem[];
+  verification: {
+    valid: boolean;
+    message: string;
+    calculated_checksum?: string;
+    original_checksum?: string;
+    sekolah?: any;
+    total_rekaman?: number;
+    waktu_ekspor?: string;
+  };
+}
 
 export default function AdminAuditLogPage() {
   const [page, setPage] = useState<number>(1);
@@ -43,6 +60,9 @@ export default function AdminAuditLogPage() {
   const [selectedResource, setSelectedResource] = useState<string>('ALL');
   const [selectedActorType, setSelectedActorType] = useState<string>('ALL');
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+
+  // Loaded Archive State (Mode Peninjau Berkas Arsip)
+  const [loadedArchive, setLoadedArchive] = useState<LoadedArchive | null>(null);
 
   // Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -58,23 +78,25 @@ export default function AdminAuditLogPage() {
   // Verify State
   const [verifyFile, setVerifyFile] = useState<File | null>(null);
   const [verifyResult, setVerifyResult] = useState<any | null>(null);
+  const [parsedArchiveData, setParsedArchiveData] = useState<any | null>(null);
 
-  // 1. Query Daftar Modul Resource untuk Filter
-  const { data: resourceList = [] } = useQuery<string[]>({
+  // 1. Query Daftar Modul Resource dari Live DB
+  const { data: dbResourceList = [] } = useQuery<string[]>({
     queryKey: ['audit-log-resources'],
     queryFn: async () => {
       const res = await api.get('/audit-logs/resources');
       const payload = res.data?.data ?? res.data;
       return Array.isArray(payload) ? payload : [];
     },
+    enabled: !loadedArchive,
   });
 
-  // 2. Query Utama Audit Logs dari Database (Read-Only)
+  // 2. Query Utama Audit Logs dari Live Database (Read-Only)
   const {
-    data: auditData,
-    isLoading,
-    isFetching,
-    refetch,
+    data: liveAuditData,
+    isLoading: isLoadingLive,
+    isFetching: isFetchingLive,
+    refetch: refetchLive,
   } = useQuery<{ data: AuditLogItem[]; meta: { total: number; page: number; limit: number; totalPages: number } }>({
     queryKey: ['audit-logs', page, limit, activeSearch, selectedResource, selectedActorType],
     queryFn: async () => {
@@ -106,10 +128,79 @@ export default function AdminAuditLogPage() {
         },
       };
     },
+    enabled: !loadedArchive,
   });
 
-  const logs = auditData?.data || [];
-  const meta = auditData?.meta || { total: 0, page: 1, limit: 20, totalPages: 1 };
+  // Daftar resource gabungan (dari DB atau diekstrak dari arsip yang sedang dibuka)
+  const availableResources = useMemo(() => {
+    if (loadedArchive) {
+      const resSet = new Set<string>();
+      loadedArchive.logs.forEach((l) => {
+        if (l.resource) resSet.add(l.resource);
+      });
+      return Array.from(resSet).sort();
+    }
+    return dbResourceList;
+  }, [loadedArchive, dbResourceList]);
+
+  // Data Log & Metadata (Menyesuaikan apakah sedang Mode Live DB atau Mode Peninjau Arsip)
+  const { displayLogs, displayMeta, isCurrentLoading } = useMemo(() => {
+    if (loadedArchive) {
+      let filtered = [...loadedArchive.logs];
+
+      if (activeSearch.trim()) {
+        const q = activeSearch.toLowerCase().trim();
+        filtered = filtered.filter(
+          (l) =>
+            l.action?.toLowerCase().includes(q) ||
+            l.resource?.toLowerCase().includes(q) ||
+            l.details?.toLowerCase().includes(q) ||
+            l.actor_name?.toLowerCase().includes(q) ||
+            l.actor_identifier?.toLowerCase().includes(q) ||
+            l.ip_address?.toLowerCase().includes(q),
+        );
+      }
+
+      if (selectedResource !== 'ALL') {
+        filtered = filtered.filter((l) => l.resource === selectedResource);
+      }
+
+      if (selectedActorType !== 'ALL') {
+        filtered = filtered.filter((l) => l.actor_type === selectedActorType);
+      }
+
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const startIdx = (page - 1) * limit;
+      const paginated = filtered.slice(startIdx, startIdx + limit);
+
+      return {
+        displayLogs: paginated,
+        displayMeta: {
+          total,
+          page,
+          limit,
+          totalPages,
+        },
+        isCurrentLoading: false,
+      };
+    }
+
+    return {
+      displayLogs: liveAuditData?.data || [],
+      displayMeta: liveAuditData?.meta || { total: 0, page: 1, limit: 20, totalPages: 1 },
+      isCurrentLoading: isLoadingLive,
+    };
+  }, [
+    loadedArchive,
+    liveAuditData,
+    isLoadingLive,
+    activeSearch,
+    selectedResource,
+    selectedActorType,
+    page,
+    limit,
+  ]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +244,7 @@ export default function AdminAuditLogPage() {
       URL.revokeObjectURL(url);
 
       setIsExportModalOpen(false);
-      refetch();
+      if (!loadedArchive) refetchLive();
     } catch (err: any) {
       alert(`Gagal mengekspor arsip log: ${err?.message || 'Terjadi kesalahan sistem'}`);
     } finally {
@@ -168,12 +259,14 @@ export default function AdminAuditLogPage() {
     try {
       setIsVerifying(true);
       setVerifyResult(null);
+      setParsedArchiveData(null);
 
       const fileContent = await verifyFile.text();
-      const parsedData = JSON.parse(fileContent);
+      const parsed = JSON.parse(fileContent);
+      setParsedArchiveData(parsed);
 
       const res = await api.post('/audit-logs/verify', {
-        archive_data: parsedData,
+        archive_data: parsed,
       });
 
       const result = res.data?.data ?? res.data;
@@ -186,6 +279,21 @@ export default function AdminAuditLogPage() {
     } finally {
       setIsVerifying(false);
     }
+  };
+
+  // Handler Buka Arsip ke Mode Peninjau Tabel
+  const handleOpenArchiveInTable = () => {
+    if (!parsedArchiveData || !verifyResult) return;
+
+    setLoadedArchive({
+      filename: verifyFile?.name || 'Berkas_Arsip_Audit.json',
+      cert: parsedArchiveData.sertifikat_integritas,
+      logs: Array.isArray(parsedArchiveData.data_log) ? parsedArchiveData.data_log : [],
+      verification: verifyResult,
+    });
+
+    setIsVerifyModalOpen(false);
+    handleResetFilter();
   };
 
   const getActorBadgeVariant = (type: UserRole | string) => {
@@ -215,56 +323,140 @@ export default function AdminAuditLogPage() {
       {/* Header Utama & Tombol Ekspor/Verifikasi */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <PageHeader
-          title="Log Aktivitas & Audit Sistem"
-          description="Rekam jejak permanen seluruh aktivitas administratif, autentikasi pengguna, manajemen jadwal, dan perizinan"
+          title={
+            loadedArchive
+              ? 'Peninjau Berkas Arsip Audit Log'
+              : 'Log Aktivitas & Audit Sistem'
+          }
+          description={
+            loadedArchive
+              ? `Menampilkan riwayat rekaman dari berkas arsip resmi: ${loadedArchive.filename}`
+              : 'Rekam jejak permanen seluruh aktivitas administratif, autentikasi pengguna, manajemen jadwal, dan perizinan'
+          }
         />
 
         <div className="flex items-center gap-2.5">
-          {/* Tombol Verifikasi Integritas SHA-256 */}
+          {loadedArchive ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLoadedArchive(null);
+                handleResetFilter();
+              }}
+              className="text-xs h-9 bg-surface border-border hover:bg-background"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1.5" />
+              Kembali ke Database Aktif
+            </Button>
+          ) : (
+            <>
+              {/* Tombol Verifikasi Integritas SHA-256 & Buka Arsip */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setVerifyFile(null);
+                  setVerifyResult(null);
+                  setParsedArchiveData(null);
+                  setIsVerifyModalOpen(true);
+                }}
+                className="text-xs h-9 border-border hover:bg-surface-muted"
+              >
+                <ShieldCheck className="w-4 h-4 mr-1.5 text-primary" />
+                Verifikasi & Buka Arsip
+              </Button>
+
+              {/* Tombol Ekspor Resmi */}
+              <Button
+                size="sm"
+                onClick={() => setIsExportModalOpen(true)}
+                className="text-xs h-9 bg-primary text-white hover:bg-primary/90"
+              >
+                <Download className="w-4 h-4 mr-1.5" />
+                Ekspor Arsip Resmi
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Mode Banner: Live DB atau Loaded Archive Banner */}
+      {loadedArchive ? (
+        <div
+          className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs ${
+            loadedArchive.verification.valid
+              ? 'bg-success-light/40 border-success/30'
+              : 'bg-danger-light/40 border-danger/30'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`p-2 rounded-lg mt-0.5 ${
+                loadedArchive.verification.valid
+                  ? 'bg-success/15 text-success'
+                  : 'bg-danger/15 text-danger'
+              }`}
+            >
+              <FolderOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-foreground text-sm">
+                  {loadedArchive.filename}
+                </span>
+                <Badge
+                  variant={loadedArchive.verification.valid ? 'success' : 'danger'}
+                  className="text-[10px] px-2 py-0.5"
+                >
+                  {loadedArchive.verification.valid
+                    ? '100% TERVERIFIKASI ASLI'
+                    : 'PERINGATAN: DIMANIPULASI'}
+                </Badge>
+              </div>
+              <p className="text-foreground-muted mt-1">
+                Penerbit: <strong className="text-foreground">{loadedArchive.cert?.sekolah?.nama || 'Sekolah'}</strong> • Total {loadedArchive.logs.length} baris rekaman log
+              </p>
+              {loadedArchive.verification.original_checksum && (
+                <p className="text-[10.5px] font-mono text-foreground-muted/90 mt-0.5 select-all">
+                  SHA-256 Digest: {loadedArchive.verification.original_checksum}
+                </p>
+              )}
+            </div>
+          </div>
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              setVerifyFile(null);
-              setVerifyResult(null);
-              setIsVerifyModalOpen(true);
+              setLoadedArchive(null);
+              handleResetFilter();
             }}
-            className="text-xs h-9 border-border hover:bg-surface-muted"
+            className="text-xs h-8 whitespace-nowrap self-start md:self-center"
           >
-            <ShieldCheck className="w-4 h-4 mr-1.5 text-primary" />
-            Verifikasi Keaslian Berkas
-          </Button>
-
-          {/* Tombol Ekspor Resmi */}
-          <Button
-            size="sm"
-            onClick={() => setIsExportModalOpen(true)}
-            className="text-xs h-9 bg-primary text-white hover:bg-primary/90"
-          >
-            <Download className="w-4 h-4 mr-1.5" />
-            Ekspor Arsip Resmi
+            Tutup Peninjau Arsip
           </Button>
         </div>
-      </div>
-
-      {/* Security & Immutability Guarantee Banner */}
-      <div className="p-3.5 bg-primary-light/50 border border-primary/20 rounded-xl flex items-start gap-3 text-xs">
-        <div className="p-1.5 bg-primary/10 rounded-lg text-primary mt-0.5">
-          <Lock className="w-4 h-4" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-foreground">Jaminan Keamanan & Integritas Audit Trail</span>
-            <Badge variant="primary" className="text-[10px] px-1.5 py-0 font-mono">
-              READ-ONLY IMMUTABLE
-            </Badge>
+      ) : (
+        /* Security & Immutability Guarantee Banner */
+        <div className="p-3.5 bg-primary-light/50 border border-primary/20 rounded-xl flex items-start gap-3 text-xs">
+          <div className="p-1.5 bg-primary/10 rounded-lg text-primary mt-0.5">
+            <Lock className="w-4 h-4" />
           </div>
-          <p className="text-foreground-muted mt-0.5 leading-relaxed">
-            Data log sistem bersifat permanen (*append-only*). Seluruh proses ekspor data dilindungi oleh tanda tangan digital
-            **SHA-256 Checksum** untuk menjamin data arsip bebas dari pemalsuan dan manipulasi manual.
-          </p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-foreground">Jaminan Keamanan & Integritas Audit Trail</span>
+              <Badge variant="primary" className="text-[10px] px-1.5 py-0 font-mono">
+                READ-ONLY IMMUTABLE
+              </Badge>
+            </div>
+            <p className="text-foreground-muted mt-0.5 leading-relaxed">
+              Data log sistem bersifat permanen (*append-only*). Seluruh proses ekspor data dilindungi oleh tanda tangan digital
+              **SHA-256 Checksum** untuk menjamin data arsip bebas dari pemalsuan dan manipulasi manual.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filter & Toolbar */}
       <Card>
@@ -275,7 +467,11 @@ export default function AdminAuditLogPage() {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
               <Input
                 type="text"
-                placeholder="Cari aksi, rincian keterangan, aktor, IP..."
+                placeholder={
+                  loadedArchive
+                    ? 'Cari di dalam arsip (aksi, rincian, aktor)...'
+                    : 'Cari aksi, rincian keterangan, aktor, IP...'
+                }
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-9 h-9 text-xs"
@@ -293,7 +489,7 @@ export default function AdminAuditLogPage() {
                 className="w-full h-9 px-3 text-xs bg-surface border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="ALL">Semua Modul Resource</option>
-                {resourceList.map((res) => (
+                {availableResources.map((res) => (
                   <option key={res} value={res}>
                     Modul: {res}
                   </option>
@@ -327,12 +523,20 @@ export default function AdminAuditLogPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => refetch()}
-                disabled={isFetching}
+                onClick={() => {
+                  if (loadedArchive) {
+                    handleResetFilter();
+                  } else {
+                    refetchLive();
+                  }
+                }}
+                disabled={!loadedArchive && isFetchingLive}
                 className="h-9 px-2.5 text-xs"
                 title="Muat ulang data"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${!loadedArchive && isFetchingLive ? 'animate-spin' : ''}`}
+                />
               </Button>
             </div>
           </form>
@@ -376,10 +580,14 @@ export default function AdminAuditLogPage() {
           <div>
             <div className="flex items-center gap-2">
               <History className="w-5 h-5 text-primary" />
-              <CardTitle>Riwayat Aktivitas & Keamanan</CardTitle>
+              <CardTitle>
+                {loadedArchive ? 'Daftar Log dari Berkas Arsip' : 'Riwayat Aktivitas & Keamanan'}
+              </CardTitle>
             </div>
             <CardDescription className="mt-1">
-              Daftar rekam jejak aksi yang tersimpan di database sistem ({meta.total} rekaman log aktif)
+              {loadedArchive
+                ? `Menampilkan ${displayMeta.total} entri log yang tersimpan di dalam berkas arsip ini`
+                : `Daftar rekam jejak aksi yang tersimpan di database sistem (${displayMeta.total} rekaman log aktif)`}
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -413,7 +621,7 @@ export default function AdminAuditLogPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isCurrentLoading ? (
                   // Skeleton Loading Rows
                   Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={idx}>
@@ -426,7 +634,7 @@ export default function AdminAuditLogPage() {
                       <TableCell><div className="h-4 w-8 bg-surface-muted rounded animate-pulse mx-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : logs.length === 0 ? (
+                ) : displayLogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-48 text-center">
                       <div className="flex flex-col items-center justify-center text-foreground-muted space-y-2">
@@ -435,13 +643,13 @@ export default function AdminAuditLogPage() {
                         <p className="text-xs">
                           {activeSearch || selectedResource !== 'ALL' || selectedActorType !== 'ALL'
                             ? 'Coba sesuaikan kata kunci pencarian atau reset filter modul'
-                            : 'Belum ada aktivitas yang tercatat di sistem'}
+                            : 'Belum ada aktivitas yang tercatat'}
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logs.map((log) => {
+                  displayLogs.map((log) => {
                     const logDate = new Date(log.createdAt);
                     return (
                       <TableRow key={log.id} className="hover:bg-surface-muted/50 text-xs transition-colors">
@@ -517,13 +725,13 @@ export default function AdminAuditLogPage() {
           </div>
 
           {/* Pagination */}
-          {meta.totalPages > 1 && (
+          {displayMeta.totalPages > 1 && (
             <div className="p-4 border-t border-border">
               <Pagination
-                currentPage={meta.page}
-                totalPages={meta.totalPages}
-                totalItems={meta.total}
-                pageSize={meta.limit}
+                currentPage={displayMeta.page}
+                totalPages={displayMeta.totalPages}
+                totalItems={displayMeta.total}
+                pageSize={displayMeta.limit}
                 onPageChange={(p) => setPage(p)}
                 itemLabel="rekaman log"
               />
@@ -671,7 +879,7 @@ export default function AdminAuditLogPage() {
                 className="w-full h-9 px-3 text-xs bg-surface border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="ALL">Semua Modul</option>
-                {resourceList.map((r) => (
+                {availableResources.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -701,12 +909,12 @@ export default function AdminAuditLogPage() {
         </div>
       </Dialog>
 
-      {/* Modal Verifikasi Keaslian Berkas Arsip */}
+      {/* Modal Verifikasi Keaslian & Pembuka Berkas Arsip */}
       <Dialog
         isOpen={isVerifyModalOpen}
         onClose={() => setIsVerifyModalOpen(false)}
-        title="Verifikasi Keaslian Berkas Arsip"
-        description="Unggah berkas arsip audit log untuk memvalidasi integritas data terhadap tanda tangan digital SHA-256"
+        title="Verifikasi & Buka Berkas Arsip"
+        description="Unggah berkas arsip audit log untuk memvalidasi tanda tangan digital SHA-256 dan membuka isi rekamannya"
         maxWidth="lg"
       >
         <div className="space-y-4 py-2 text-xs">
@@ -731,6 +939,7 @@ export default function AdminAuditLogPage() {
                   if (e.target.files && e.target.files[0]) {
                     setVerifyFile(e.target.files[0]);
                     setVerifyResult(null);
+                    setParsedArchiveData(null);
                   }
                 }}
               />
@@ -758,7 +967,7 @@ export default function AdminAuditLogPage() {
             </div>
           )}
 
-          {/* Verification Result Display */}
+          {/* Verification Result Display & Tombol Buka di Tabel */}
           {verifyResult && (
             <div
               className={`p-4 rounded-xl border space-y-3 ${
@@ -824,6 +1033,25 @@ export default function AdminAuditLogPage() {
                   </div>
                 </div>
               )}
+
+              {/* Action: Telusuri Isi Arsip di Tabel */}
+              <div className="pt-2 border-t border-border/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span className="text-[11px] text-foreground-muted">
+                  Buka data log berkas ini ke dalam tabel untuk pencarian dan peninjauan:
+                </span>
+                <Button
+                  size="sm"
+                  onClick={handleOpenArchiveInTable}
+                  className={`text-xs h-8 px-3 ${
+                    verifyResult.valid
+                      ? 'bg-success hover:bg-success/90 text-white'
+                      : 'bg-danger hover:bg-danger/90 text-white'
+                  }`}
+                >
+                  <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
+                  Buka & Telusuri Isi di Tabel
+                </Button>
+              </div>
             </div>
           )}
 
