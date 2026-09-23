@@ -21,6 +21,8 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Edit3,
   Eye,
@@ -30,6 +32,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   ToggleLeft,
   ToggleRight,
@@ -95,10 +98,15 @@ export default function AdminJadwalUjianPage() {
   const [examJamSesi2Selesai, setExamJamSesi2Selesai] = useState('11:00');
   const [examTargetTingkat, setExamTargetTingkat] = useState<number[]>([10, 11, 12]);
 
-  // State Hasil Pratinjau & Detail Ujian
+  // State Hasil Pratinjau
   const [examPreviewResult, setExamPreviewResult] = useState<any | null>(null);
-  const [selectedExamDetail, setSelectedExamDetail] = useState<any | null>(null);
+
+  // State Filter & Paginasi untuk Detail Jadwal Ujian
+  const [detailExamId, setDetailExamId] = useState<string | null>(null);
+  const [detailPage, setDetailPage] = useState<number>(1);
+  const [detailLimit, setDetailLimit] = useState<number>(20);
   const [detailFilterKelas, setDetailFilterKelas] = useState<string>('ALL');
+  const [detailSearch, setDetailSearch] = useState<string>('');
 
   // State Konfirmasi Hapus
   const [examToDelete, setExamToDelete] = useState<{
@@ -161,6 +169,31 @@ export default function AdminJadwalUjianPage() {
     enabled: !!selectedTahunId,
   });
 
+  // 5. Query Detail Jadwal Ujian dengan Paginasi & Filter Optimal di Database
+  const {
+    data: detailData,
+    isLoading: isDetailLoading,
+    refetch: refetchDetail,
+  } = useQuery({
+    queryKey: ['jadwal-ujian-detail', detailExamId, detailPage, detailLimit, detailFilterKelas, detailSearch],
+    queryFn: async () => {
+      if (!detailExamId) return null;
+      const params = new URLSearchParams({
+        page: String(detailPage),
+        limit: String(detailLimit),
+      });
+      if (detailFilterKelas && detailFilterKelas !== 'ALL') {
+        params.append('kelas_id', detailFilterKelas);
+      }
+      if (detailSearch.trim()) {
+        params.append('search', detailSearch.trim());
+      }
+      const res = await api.get(`/jadwal/ujian/${detailExamId}?${params.toString()}`);
+      return res.data?.data ?? res.data;
+    },
+    enabled: !!detailExamId && activeTab === 'detail',
+  });
+
   // Otomatis update Tanggal Selesai Ujian saat Tanggal Mulai atau Sesi berubah
   useEffect(() => {
     if (examTanggalMulai) {
@@ -174,6 +207,15 @@ export default function AdminJadwalUjianPage() {
       }
     }
   }, [examTanggalMulai, examSesiPerHari, mapelList.length]);
+
+  // Handler Buka Detail Ujian
+  const handleOpenDetail = (id: string) => {
+    setDetailExamId(id);
+    setDetailPage(1);
+    setDetailFilterKelas('ALL');
+    setDetailSearch('');
+    setActiveTab('detail');
+  };
 
   // Mutasi Generate Preview Jadwal Ujian
   const generateExamPreviewMutation = useMutation({
@@ -216,7 +258,7 @@ export default function AdminJadwalUjianPage() {
     },
   });
 
-  // Mutasi Simpan Jadwal Ujian
+  // Mutasi Simpan Jadwal Ujian (Mengirim payload generator yang sangat ringan)
   const createExamMutation = useMutation({
     mutationFn: async () => {
       if (!examPreviewResult) throw new Error('Data pratinjau belum dibuat');
@@ -269,6 +311,7 @@ export default function AdminJadwalUjianPage() {
     },
     onSuccess: (res) => {
       refetchExams();
+      if (detailExamId) refetchDetail();
       toast.success(res?.message || 'Status aktivasi ujian berhasil diubah');
     },
     onError: (err: any) => {
@@ -284,8 +327,8 @@ export default function AdminJadwalUjianPage() {
     },
     onSuccess: (res) => {
       refetchExams();
-      if (selectedExamDetail) {
-        setSelectedExamDetail(null);
+      if (detailExamId) {
+        setDetailExamId(null);
         setActiveTab('list');
       }
       toast.success(res?.message || 'Jadwal ujian berhasil dihapus');
@@ -300,22 +343,6 @@ export default function AdminJadwalUjianPage() {
         err?.message ||
         'Gagal menghapus jadwal ujian';
       toast.error('Gagal menghapus jadwal ujian', serverMsg);
-    },
-  });
-
-  // Mutasi Buka Detail Ujian
-  const fetchExamDetailMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.get(`/jadwal/ujian/${id}`);
-      return res.data?.data ?? res.data;
-    },
-    onSuccess: (data) => {
-      setSelectedExamDetail(data);
-      setDetailFilterKelas('ALL');
-      setActiveTab('detail');
-    },
-    onError: (err: any) => {
-      toast.error('Gagal memuat detail ujian', err?.response?.data?.message || 'Terjadi kesalahan');
     },
   });
 
@@ -358,7 +385,7 @@ export default function AdminJadwalUjianPage() {
                   setExamPreviewResult(null);
                   setActiveTab('create');
                 }}
-                className="gap-2"
+                className="gap-2 font-bold"
               >
                 <Plus className="w-4 h-4" />
                 <span>Buat Jadwal Ujian Baru</span>
@@ -370,7 +397,7 @@ export default function AdminJadwalUjianPage() {
                 variant="outline"
                 onClick={() => {
                   setActiveTab('list');
-                  setSelectedExamDetail(null);
+                  setDetailExamId(null);
                 }}
               >
                 Kembali ke Daftar
@@ -480,7 +507,7 @@ export default function AdminJadwalUjianPage() {
           </button>
         )}
 
-        {selectedExamDetail && (
+        {activeTab === 'detail' && detailData && (
           <button
             type="button"
             onClick={() => setActiveTab('detail')}
@@ -492,7 +519,7 @@ export default function AdminJadwalUjianPage() {
             )}
           >
             <BookOpen className="w-4 h-4" />
-            <span>Detail: {selectedExamDetail.nama_ujian}</span>
+            <span>Detail: {detailData.nama_ujian}</span>
           </button>
         )}
       </div>
@@ -584,8 +611,7 @@ export default function AdminJadwalUjianPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => fetchExamDetailMutation.mutate(exam.id)}
-                          isLoading={fetchExamDetailMutation.isPending}
+                          onClick={() => handleOpenDetail(exam.id)}
                           className="text-xs gap-1.5"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -1018,17 +1044,17 @@ export default function AdminJadwalUjianPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* TAB 4: DETAIL JADWAL UJIAN TERDAFTAR                                  */}
+      {/* TAB 4: DETAIL JADWAL UJIAN TERDAFTAR (PAGINASI & FILTER CEPAT)        */}
       {/* ===================================================================== */}
-      {activeTab === 'detail' && selectedExamDetail && (
+      {activeTab === 'detail' && detailData && (
         <div className="space-y-5">
-          <div className="p-5 rounded-2xl bg-surface border border-border flex items-center justify-between">
+          <div className="p-5 rounded-2xl bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-bold text-foreground">
-                  {selectedExamDetail.nama_ujian}
+                  {detailData.nama_ujian}
                 </h3>
-                {selectedExamDetail.is_active ? (
+                {detailData.is_active ? (
                   <Badge variant="warning" className="text-xs font-bold gap-1">
                     <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
                     <span>Aktif di Mobile</span>
@@ -1040,33 +1066,30 @@ export default function AdminJadwalUjianPage() {
                 )}
               </div>
               <p className="text-xs text-foreground-muted">
-                Periode: {selectedExamDetail.tanggal_mulai} s.d {selectedExamDetail.tanggal_selesai} • Total {(selectedExamDetail.items || []).length} Sesi Ujian
+                Periode: {detailData.tanggal_mulai} s.d {detailData.tanggal_selesai} • Total {detailData.meta?.total || 0} Sesi Ujian Terjadwal
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               <Button
-                variant={selectedExamDetail.is_active ? 'outline' : 'primary'}
+                variant={detailData.is_active ? 'outline' : 'primary'}
                 onClick={() => {
                   toggleExamStatusMutation.mutate(
                     {
-                      id: selectedExamDetail.id,
-                      is_active: !selectedExamDetail.is_active,
+                      id: detailData.id,
+                      is_active: !detailData.is_active,
                     },
                     {
                       onSuccess: () => {
-                        setSelectedExamDetail({
-                          ...selectedExamDetail,
-                          is_active: !selectedExamDetail.is_active,
-                        });
+                        refetchDetail();
                       },
                     },
                   );
                 }}
                 isLoading={toggleExamStatusMutation.isPending}
-                className="gap-1.5 text-xs"
+                className="gap-1.5 text-xs font-semibold"
               >
-                {selectedExamDetail.is_active ? (
+                {detailData.is_active ? (
                   <>
                     <ToggleRight className="w-4 h-4 text-warning" />
                     <span>Nonaktifkan</span>
@@ -1081,61 +1104,156 @@ export default function AdminJadwalUjianPage() {
             </div>
           </div>
 
-          {/* Filter Kelas Detail */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-foreground-muted">Filter Kelas:</span>
-              <Select
-                value={detailFilterKelas}
-                onChange={(e) => setDetailFilterKelas(e.target.value)}
-                className="w-48 text-xs"
-              >
-                <option value="ALL">Semua Kelas ({kelasList.length})</option>
-                {kelasList.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    Kelas {k.tingkat} {k.jurusan?.kode} {k.nama_rombel}
-                  </option>
-                ))}
-              </Select>
+          {/* Filter & Pencarian Cepat */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-foreground-muted">Filter Kelas:</span>
+                <Select
+                  value={detailFilterKelas}
+                  onChange={(e) => {
+                    setDetailFilterKelas(e.target.value);
+                    setDetailPage(1);
+                  }}
+                  className="w-48 text-xs"
+                >
+                  <option value="ALL">Semua Kelas ({kelasList.length})</option>
+                  {kelasList.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      Kelas {k.tingkat} {k.jurusan?.kode} {k.nama_rombel}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-foreground-muted">Baris:</span>
+                <Select
+                  value={String(detailLimit)}
+                  onChange={(e) => {
+                    setDetailLimit(Number(e.target.value));
+                    setDetailPage(1);
+                  }}
+                  className="w-24 text-xs"
+                >
+                  <option value="10">10 / hal</option>
+                  <option value="20">20 / hal</option>
+                  <option value="50">50 / hal</option>
+                  <option value="100">100 / hal</option>
+                </Select>
+              </div>
+            </div>
+
+            {/* Kotak Pencarian */}
+            <div className="relative sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+              <input
+                type="text"
+                value={detailSearch}
+                onChange={(e) => {
+                  setDetailSearch(e.target.value);
+                  setDetailPage(1);
+                }}
+                placeholder="Cari mapel, guru, ruangan..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-primary"
+              />
             </div>
           </div>
 
-          {/* Tabel Detail */}
+          {/* Tabel Detail Terpaginasi */}
           <div className="border border-border rounded-xl bg-surface overflow-hidden">
-            <div className="max-h-[500px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">No</TableHead>
-                    <TableHead className="w-36">Tanggal & Jam</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    <TableHead>Kelas</TableHead>
-                    <TableHead>Ruangan</TableHead>
-                    <TableHead>Pengawas</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(selectedExamDetail.items || [])
-                    .filter((it: any) => detailFilterKelas === 'ALL' || it.kelas_id === detailFilterKelas)
-                    .map((it: any, idx: number) => (
-                      <TableRow key={it.id || idx}>
-                        <TableCell className="text-foreground-muted text-xs">{idx + 1}</TableCell>
-                        <TableCell>
-                          <div className="text-xs font-semibold text-foreground">{it.tanggal}</div>
-                          <div className="font-mono text-xs text-primary">{it.jam_mulai} - {it.jam_selesai}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-xs font-bold text-foreground">{it.mapel_nama}</div>
-                          <div className="text-[11px] font-mono text-foreground-muted">{it.mapel_kode}</div>
-                        </TableCell>
-                        <TableCell className="text-xs font-medium text-foreground">{it.kelas_nama}</TableCell>
-                        <TableCell className="text-xs font-mono text-foreground">{it.ruangan || '-'}</TableCell>
-                        <TableCell className="text-xs text-foreground-muted">{it.guru_nama || '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
+            {isDetailLoading ? (
+              <div className="py-12 text-center text-foreground-muted space-y-2">
+                <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
+                <p className="text-xs">Memuat data sesi ujian...</p>
+              </div>
+            ) : (detailData.items || []).length === 0 ? (
+              <div className="py-12 text-center text-foreground-muted">
+                <p className="text-xs font-semibold text-foreground">Tidak ada data sesi ujian</p>
+                <p className="text-xs text-foreground-muted mt-1">Coba sesuaikan filter kelas atau kata kunci pencarian</p>
+              </div>
+            ) : (
+              <div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No</TableHead>
+                      <TableHead className="w-36">Tanggal & Jam</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead>Ruangan</TableHead>
+                      <TableHead>Pengawas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(detailData.items || []).map((it: any, idx: number) => {
+                      const rowNum = (detailData.meta?.page - 1) * detailData.meta?.limit + idx + 1;
+                      return (
+                        <TableRow key={it.id || idx}>
+                          <TableCell className="text-foreground-muted text-xs">{rowNum}</TableCell>
+                          <TableCell>
+                            <div className="text-xs font-semibold text-foreground">{it.tanggal}</div>
+                            <div className="font-mono text-xs text-primary">{it.jam_mulai} - {it.jam_selesai}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-xs font-bold text-foreground">{it.mapel_nama}</div>
+                            <div className="text-[11px] font-mono text-foreground-muted">{it.mapel_kode}</div>
+                          </TableCell>
+                          <TableCell className="text-xs font-medium text-foreground">{it.kelas_nama}</TableCell>
+                          <TableCell className="text-xs font-mono text-foreground">{it.ruangan || '-'}</TableCell>
+                          <TableCell className="text-xs text-foreground-muted">{it.guru_nama || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                {/* Kontrol Navigasi Paginasi */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border/70 bg-background/50 text-xs">
+                  <span className="text-foreground-muted">
+                    Menampilkan{' '}
+                    <strong className="text-foreground">
+                      {(detailData.meta?.page - 1) * detailData.meta?.limit + 1}
+                    </strong>{' '}
+                    sampai{' '}
+                    <strong className="text-foreground">
+                      {Math.min(detailData.meta?.page * detailData.meta?.limit, detailData.meta?.total)}
+                    </strong>{' '}
+                    dari <strong className="text-foreground">{detailData.meta?.total}</strong> total sesi
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDetailPage((p) => Math.max(1, p - 1))}
+                      disabled={detailData.meta?.page <= 1 || isDetailLoading}
+                      className="text-xs gap-1"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Sebelumnya</span>
+                    </Button>
+
+                    <span className="px-2 font-semibold text-foreground">
+                      Halaman {detailData.meta?.page} dari {detailData.meta?.totalPages || 1}
+                    </span>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDetailPage((p) => Math.min(detailData.meta?.totalPages || 1, p + 1))}
+                      disabled={detailData.meta?.page >= (detailData.meta?.totalPages || 1) || isDetailLoading}
+                      className="text-xs gap-1"
+                    >
+                      <span>Selanjutnya</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
