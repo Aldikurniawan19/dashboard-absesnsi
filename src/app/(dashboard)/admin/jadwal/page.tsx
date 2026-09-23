@@ -561,17 +561,13 @@ export default function AdminJadwalPage() {
         tahun_ajaran_id: selectedTahunId,
         tanggal_mulai: examPreviewResult.tanggal_mulai,
         tanggal_selesai: examPreviewResult.tanggal_selesai,
+        sesi_per_hari: examSesiPerHari,
+        jam_mulai_sesi_1: examJamSesi1Mulai,
+        jam_selesai_sesi_1: examJamSesi1Selesai,
+        jam_mulai_sesi_2: examJamSesi2Mulai,
+        jam_selesai_sesi_2: examJamSesi2Selesai,
+        tingkat_list: examTargetTingkat,
         is_active: examIsActive,
-        items: (examPreviewResult.items || []).map((item: any) => ({
-          kelas_id: String(item.kelas_id),
-          mapel_id: String(item.mapel_id),
-          guru_id: item.guru_id ? String(item.guru_id) : undefined,
-          tanggal: String(item.tanggal),
-          hari: Number(item.hari) || 1,
-          jam_mulai: String(item.jam_mulai),
-          jam_selesai: String(item.jam_selesai),
-          ruangan: item.ruangan ? String(item.ruangan) : undefined,
-        })),
       };
       const res = await api.post('/jadwal/ujian', payload);
       return res.data;
