@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/loading-state';
 import { cn } from '@/lib/utils';
@@ -240,12 +241,16 @@ export default function AdminJadwalUjianPage() {
       const res = await api.post('/jadwal/ujian/generate-preview', payload);
       return res.data?.data ?? res.data;
     },
+    onMutate: () => {
+      setActiveTab('preview');
+    },
     onSuccess: (data) => {
       setExamPreviewResult(data);
       setActiveTab('preview');
       toast.success('Pratinjau jadwal ujian berhasil dibuat', `${data.total_items} sesi ujian siap ditinjau`);
     },
     onError: (err: any) => {
+      setActiveTab('create');
       const serverMsg =
         (typeof err?.response?.data === 'string' ? err.response.data : null) ||
         (Array.isArray(err?.response?.data?.message)
@@ -362,17 +367,16 @@ export default function AdminJadwalUjianPage() {
         description="Kelola jadwal ujian sekolah (PTS, PAS, PAT, US) dan status aktivasi untuk aplikasi mobile siswa dan guru."
         actions={
           <div className="flex items-center gap-3">
-            <Select
-              value={selectedTahunId}
-              onChange={(e) => setSelectedTahunId(e.target.value)}
-              className="w-56"
-            >
-              {tahunList.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nama} - {t.semester} {t.status === 'AKTIF' ? '(Aktif)' : ''}
-                </option>
-              ))}
-            </Select>
+            <div className="w-56 sm:w-64">
+              <Select
+                value={selectedTahunId}
+                onChange={(e) => setSelectedTahunId(e.target.value)}
+                options={tahunList.map((t) => ({
+                  label: `${t.nama} (${t.semester}) ${t.status === 'AKTIF' ? '— Aktif' : ''}`,
+                  value: t.id,
+                }))}
+              />
+            </div>
 
             {activeTab === 'list' && (
               <Button
@@ -491,7 +495,7 @@ export default function AdminJadwalUjianPage() {
           <span>Buat Jadwal Baru</span>
         </button>
 
-        {examPreviewResult && (
+        {(examPreviewResult || generateExamPreviewMutation.isPending) && (
           <button
             type="button"
             onClick={() => setActiveTab('preview')}
@@ -502,7 +506,11 @@ export default function AdminJadwalUjianPage() {
                 : 'border-transparent text-foreground-muted hover:text-foreground',
             )}
           >
-            <Eye className="w-4 h-4" />
+            {generateExamPreviewMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
             <span>Pratinjau Hasil Generate</span>
           </button>
         )}
@@ -738,13 +746,14 @@ export default function AdminJadwalUjianPage() {
                     label="Kategori / Jenis Ujian"
                     value={examJenis}
                     onChange={(e) => setExamJenis(e.target.value)}
+                    options={[
+                      { label: 'Penilaian Tengah Semester (PTS)', value: 'PTS' },
+                      { label: 'Penilaian Akhir Semester (PAS)', value: 'PAS' },
+                      { label: 'Penilaian Akhir Tahun (PAT)', value: 'PAT' },
+                      { label: 'Ujian Sekolah (US)', value: 'US' },
+                    ]}
                     required
-                  >
-                    <option value="PTS">Penilaian Tengah Semester (PTS)</option>
-                    <option value="PAS">Penilaian Akhir Semester (PAS)</option>
-                    <option value="PAT">Penilaian Akhir Tahun (PAT)</option>
-                    <option value="US">Ujian Sekolah (US)</option>
-                  </Select>
+                  />
                 </div>
               </div>
 
@@ -943,104 +952,198 @@ export default function AdminJadwalUjianPage() {
       {/* ===================================================================== */}
       {/* TAB 3: PRATINJAU HASIL GENERATE JADWAL UJIAN                          */}
       {/* ===================================================================== */}
-      {activeTab === 'preview' && examPreviewResult && (
-        <div className="space-y-5">
-          {/* Ringkasan Parameter */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-4 rounded-xl bg-surface border border-border">
-              <span className="text-xs text-foreground-muted block mb-1">Nama Ujian</span>
-              <p className="font-bold text-sm text-foreground truncate">{examPreviewResult.nama_ujian}</p>
-            </div>
-            <div className="p-4 rounded-xl bg-surface border border-border">
-              <span className="text-xs text-foreground-muted block mb-1">Rentang Waktu</span>
-              <p className="font-bold text-sm text-primary">
-                {examPreviewResult.tanggal_mulai} s.d {examPreviewResult.tanggal_selesai}
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-surface border border-border">
-              <span className="text-xs text-foreground-muted block mb-1">Cakupan Kelas</span>
-              <p className="font-bold text-sm text-foreground">
-                {examPreviewResult.total_kelas} Rombel ({examPreviewResult.total_items} Sesi)
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-surface border border-border">
-              <span className="text-xs text-foreground-muted block mb-1">Status Penerapan</span>
-              <p className={cn('font-bold text-sm', examIsActive ? 'text-warning font-semibold' : 'text-foreground-muted')}>
-                {examIsActive ? 'Aktif di Mobile' : 'Disimpan sebagai Draf'}
-              </p>
-            </div>
-          </div>
-
-          {/* Tabel Pratinjau Sesi */}
-          <div className="border border-border rounded-xl bg-surface overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-sm text-foreground">Pratinjau Sesi Ujian</h4>
-                <p className="text-xs text-foreground-muted">
-                  Menampilkan contoh sesi ujian yang akan dibuat secara otomatis
-                </p>
+      {activeTab === 'preview' && (
+        generateExamPreviewMutation.isPending ? (
+          <div className="space-y-5 animate-in fade-in-50 duration-200">
+            {/* Banner Status Loading */}
+            <div className="p-4 rounded-xl border border-primary/30 bg-primary-light/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary text-white shrink-0">
+                  <Sparkles className="w-5 h-5 animate-spin" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">
+                    Sedang Mengkalkulasi Pratinjau Jadwal Ujian...
+                  </h4>
+                  <p className="text-xs text-foreground-muted">
+                    Menyusun pembagian sesi harian, alokasi ruang ujian, dan pengawas secara otomatis tanpa bentrok
+                  </p>
+                </div>
               </div>
-              <Badge variant="outline" className="text-xs">
-                Total {examPreviewResult.total_items} Sesi Terjadwal
+              <Badge variant="outline" className="text-xs gap-1.5 self-start sm:self-auto border-primary/40 bg-surface">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                <span>Memproses Jadwal</span>
               </Badge>
             </div>
 
-            <div className="max-h-96 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">No</TableHead>
-                    <TableHead className="w-36">Tanggal & Jam</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    <TableHead>Kelas Target</TableHead>
-                    <TableHead>Ruang Ujian</TableHead>
-                    <TableHead>Pengawas Ujian</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(examPreviewResult.items || []).slice(0, 100).map((slot: any, idx: number) => (
-                    <TableRow key={idx}>
-                      <TableCell className="text-foreground-muted text-xs">{idx + 1}</TableCell>
-                      <TableCell>
-                        <div className="text-xs font-semibold text-foreground">{slot.tanggal}</div>
-                        <div className="font-mono text-xs text-primary">{slot.jam_mulai} - {slot.jam_selesai}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs font-bold text-foreground">{slot.mapel_nama}</div>
-                        <div className="text-[11px] font-mono text-foreground-muted">{slot.mapel_kode}</div>
-                      </TableCell>
-                      <TableCell className="text-xs font-medium text-foreground">{slot.kelas_nama}</TableCell>
-                      <TableCell className="text-xs font-mono text-foreground">{slot.ruangan}</TableCell>
-                      <TableCell className="text-xs text-foreground-muted">{slot.guru_nama}</TableCell>
+            {/* Skeleton Ringkasan 4 Kartu Parameter */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Nama Ujian' },
+                { label: 'Rentang Waktu' },
+                { label: 'Cakupan Kelas' },
+                { label: 'Status Penerapan' },
+              ].map((item, idx) => (
+                <div key={idx} className="p-4 rounded-xl bg-surface border border-border space-y-2">
+                  <span className="text-xs text-foreground-muted block">{item.label}</span>
+                  <Skeleton className="h-5 w-3/4 rounded" />
+                </div>
+              ))}
+            </div>
+
+            {/* Skeleton Tabel Sesi Ujian */}
+            <div className="border border-border rounded-xl bg-surface overflow-hidden">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div className="space-y-1">
+                  <Skeleton className="h-4.5 w-40 rounded" />
+                  <Skeleton className="h-3.5 w-72 rounded" />
+                </div>
+                <Skeleton className="h-6 w-36 rounded-full" />
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No</TableHead>
+                      <TableHead className="w-36">Tanggal & Jam</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Kelas Target</TableHead>
+                      <TableHead>Ruang Ujian</TableHead>
+                      <TableHead>Pengawas Ujian</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, rIdx) => (
+                      <TableRow key={rIdx}>
+                        <TableCell><Skeleton className="h-3.5 w-4 rounded" /></TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-3.5 w-20 rounded" />
+                            <Skeleton className="h-3 w-16 rounded" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-4 w-36 rounded" />
+                            <Skeleton className="h-3 w-12 rounded" />
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-24 rounded" /></TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-16 rounded" /></TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-28 rounded" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Skeleton Tombol Aksi Bawah */}
+            <div className="flex justify-end gap-3 pt-2">
+              <Skeleton className="h-9 w-28 rounded-lg" />
+              <Skeleton className="h-9 w-48 rounded-lg" />
             </div>
           </div>
+        ) : examPreviewResult ? (
+          <div className="space-y-5 animate-in fade-in-50 duration-200">
+            {/* Ringkasan Parameter */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <span className="text-xs text-foreground-muted block mb-1">Nama Ujian</span>
+                <p className="font-bold text-sm text-foreground truncate">{examPreviewResult.nama_ujian}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <span className="text-xs text-foreground-muted block mb-1">Rentang Waktu</span>
+                <p className="font-bold text-sm text-primary">
+                  {examPreviewResult.tanggal_mulai} s.d {examPreviewResult.tanggal_selesai}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <span className="text-xs text-foreground-muted block mb-1">Cakupan Kelas</span>
+                <p className="font-bold text-sm text-foreground">
+                  {examPreviewResult.total_kelas} Rombel ({examPreviewResult.total_items} Sesi)
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <span className="text-xs text-foreground-muted block mb-1">Status Penerapan</span>
+                <p className={cn('font-bold text-sm', examIsActive ? 'text-warning font-semibold' : 'text-foreground-muted')}>
+                  {examIsActive ? 'Aktif di Mobile' : 'Disimpan sebagai Draf'}
+                </p>
+              </div>
+            </div>
 
-          {/* Tombol Simpan */}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setActiveTab('create')}
-              disabled={createExamMutation.isPending}
-            >
-              Ubah Parameter
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => createExamMutation.mutate()}
-              isLoading={createExamMutation.isPending}
-              className="gap-2 font-bold"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Simpan Jadwal Ujian Ini</span>
-            </Button>
+            {/* Tabel Pratinjau Sesi */}
+            <div className="border border-border rounded-xl bg-surface overflow-hidden">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-sm text-foreground">Pratinjau Sesi Ujian</h4>
+                  <p className="text-xs text-foreground-muted">
+                    Menampilkan contoh sesi ujian yang akan dibuat secara otomatis
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  Total {examPreviewResult.total_items} Sesi Terjadwal
+                </Badge>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No</TableHead>
+                      <TableHead className="w-36">Tanggal & Jam</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Kelas Target</TableHead>
+                      <TableHead>Ruang Ujian</TableHead>
+                      <TableHead>Pengawas Ujian</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(examPreviewResult.items || []).slice(0, 100).map((slot: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-foreground-muted text-xs">{idx + 1}</TableCell>
+                        <TableCell>
+                          <div className="text-xs font-semibold text-foreground">{slot.tanggal}</div>
+                          <div className="font-mono text-xs text-primary">{slot.jam_mulai} - {slot.jam_selesai}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-xs font-bold text-foreground">{slot.mapel_nama}</div>
+                          <div className="text-[11px] font-mono text-foreground-muted">{slot.mapel_kode}</div>
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-foreground">{slot.kelas_nama}</TableCell>
+                        <TableCell className="text-xs font-mono text-foreground">{slot.ruangan}</TableCell>
+                        <TableCell className="text-xs text-foreground-muted">{slot.guru_nama}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Tombol Simpan */}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setActiveTab('create')}
+                disabled={createExamMutation.isPending}
+              >
+                Ubah Parameter
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => createExamMutation.mutate()}
+                isLoading={createExamMutation.isPending}
+                className="gap-2 font-bold"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Simpan Jadwal Ujian Ini</span>
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : null
       )}
 
       {/* ===================================================================== */}
@@ -1106,56 +1209,52 @@ export default function AdminJadwalUjianPage() {
 
           {/* Filter & Pencarian Cepat */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-foreground-muted">Filter Kelas:</span>
+            <div className="flex flex-wrap items-center gap-3 flex-1">
+              <div className="w-full sm:w-60">
                 <Select
                   value={detailFilterKelas}
                   onChange={(e) => {
                     setDetailFilterKelas(e.target.value);
                     setDetailPage(1);
                   }}
-                  className="w-48 text-xs"
-                >
-                  <option value="ALL">Semua Kelas ({kelasList.length})</option>
-                  {kelasList.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      Kelas {k.tingkat} {k.jurusan?.kode} {k.nama_rombel}
-                    </option>
-                  ))}
-                </Select>
+                  options={[
+                    { label: `Semua Kelas (${kelasList.length})`, value: 'ALL' },
+                    ...kelasList.map((k) => ({
+                      label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
+                      value: k.id,
+                    })),
+                  ]}
+                />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-foreground-muted">Baris:</span>
+              <div className="w-36">
                 <Select
                   value={String(detailLimit)}
                   onChange={(e) => {
                     setDetailLimit(Number(e.target.value));
                     setDetailPage(1);
                   }}
-                  className="w-24 text-xs"
-                >
-                  <option value="10">10 / hal</option>
-                  <option value="20">20 / hal</option>
-                  <option value="50">50 / hal</option>
-                  <option value="100">100 / hal</option>
-                </Select>
+                  options={[
+                    { label: '10 / halaman', value: '10' },
+                    { label: '20 / halaman', value: '20' },
+                    { label: '50 / halaman', value: '50' },
+                    { label: '100 / halaman', value: '100' },
+                  ]}
+                />
               </div>
             </div>
 
             {/* Kotak Pencarian */}
-            <div className="relative sm:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
-              <input
-                type="text"
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-foreground-muted pointer-events-none" />
+              <Input
                 value={detailSearch}
                 onChange={(e) => {
                   setDetailSearch(e.target.value);
                   setDetailPage(1);
                 }}
                 placeholder="Cari mapel, guru, ruangan..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-primary"
+                className="pl-9"
               />
             </div>
           </div>
@@ -1163,9 +1262,48 @@ export default function AdminJadwalUjianPage() {
           {/* Tabel Detail Terpaginasi */}
           <div className="border border-border rounded-xl bg-surface overflow-hidden">
             {isDetailLoading ? (
-              <div className="py-12 text-center text-foreground-muted space-y-2">
-                <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
-                <p className="text-xs">Memuat data sesi ujian...</p>
+              <div className="p-4 space-y-3 animate-in fade-in-50 duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-36 rounded" />
+                    <Skeleton className="h-3 w-56 rounded" />
+                  </div>
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No</TableHead>
+                      <TableHead className="w-36">Tanggal & Jam</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead>Ruangan</TableHead>
+                      <TableHead>Pengawas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 6 }).map((_, rIdx) => (
+                      <TableRow key={rIdx}>
+                        <TableCell><Skeleton className="h-3.5 w-4 rounded" /></TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-3.5 w-20 rounded" />
+                            <Skeleton className="h-3 w-16 rounded" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-4 w-32 rounded" />
+                            <Skeleton className="h-3 w-12 rounded" />
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-24 rounded" /></TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-14 rounded" /></TableCell>
+                        <TableCell><Skeleton className="h-3.5 w-28 rounded" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : (detailData.items || []).length === 0 ? (
               <div className="py-12 text-center text-foreground-muted">
@@ -1208,49 +1346,17 @@ export default function AdminJadwalUjianPage() {
                   </TableBody>
                 </Table>
 
-                {/* Kontrol Navigasi Paginasi */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border/70 bg-background/50 text-xs">
-                  <span className="text-foreground-muted">
-                    Menampilkan{' '}
-                    <strong className="text-foreground">
-                      {(detailData.meta?.page - 1) * detailData.meta?.limit + 1}
-                    </strong>{' '}
-                    sampai{' '}
-                    <strong className="text-foreground">
-                      {Math.min(detailData.meta?.page * detailData.meta?.limit, detailData.meta?.total)}
-                    </strong>{' '}
-                    dari <strong className="text-foreground">{detailData.meta?.total}</strong> total sesi
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDetailPage((p) => Math.max(1, p - 1))}
-                      disabled={detailData.meta?.page <= 1 || isDetailLoading}
-                      className="text-xs gap-1"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>Sebelumnya</span>
-                    </Button>
-
-                    <span className="px-2 font-semibold text-foreground">
-                      Halaman {detailData.meta?.page} dari {detailData.meta?.totalPages || 1}
-                    </span>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDetailPage((p) => Math.min(detailData.meta?.totalPages || 1, p + 1))}
-                      disabled={detailData.meta?.page >= (detailData.meta?.totalPages || 1) || isDetailLoading}
-                      className="text-xs gap-1"
-                    >
-                      <span>Selanjutnya</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                {/* Kontrol Navigasi Paginasi Standar */}
+                <div className="p-4 border-t border-border/60 bg-surface">
+                  <Pagination
+                    currentPage={detailData.meta?.page || detailPage}
+                    totalPages={detailData.meta?.totalPages || 1}
+                    totalItems={detailData.meta?.total || 0}
+                    pageSize={detailData.meta?.limit || detailLimit}
+                    onPageChange={(page) => setDetailPage(page)}
+                    itemLabel="sesi ujian"
+                    hideOnSinglePage={false}
+                  />
                 </div>
               </div>
             )}

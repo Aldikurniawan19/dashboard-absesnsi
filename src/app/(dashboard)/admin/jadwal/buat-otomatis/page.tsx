@@ -722,17 +722,16 @@ export default function BuatJadwalOtomatisPage() {
                 {previewViewMode === 'jadwal' && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-foreground-muted font-medium whitespace-nowrap">Pilih Kelas:</span>
-                    <select
-                      value={previewKelasId}
-                      onChange={(e) => setPreviewKelasId(e.target.value)}
-                      className="h-9 rounded-md border border-border bg-surface px-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      {(previewResult.class_summaries || []).map((c: any) => (
-                        <option key={c.kelas_id} value={c.kelas_id}>
-                          {c.kelas_nama} ({c.total_jp} JP — {c.total_mapel} Mapel)
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-64">
+                      <Select
+                        value={previewKelasId}
+                        onChange={(e) => setPreviewKelasId(e.target.value)}
+                        options={(previewResult.class_summaries || []).map((c: any) => ({
+                          label: `${c.kelas_nama} (${c.total_jp} JP — ${c.total_mapel} Mapel)`,
+                          value: c.kelas_id,
+                        }))}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
