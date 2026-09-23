@@ -15,7 +15,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/loading-state';
 import { cn } from '@/lib/utils';
-import { Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
+import { Kelas, MataPelajaran, TahunAjaran, KartuUjian, KartuUjianSummary } from '@/types/api';
 import { toast } from '@/components/ui/toast';
 import {
   AlertCircle,
@@ -25,13 +25,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Download,
   Edit3,
   Eye,
+  FileText,
   GraduationCap,
   Info,
   Layers,
+  LayoutGrid,
   Loader2,
   Plus,
+  Printer,
+  QrCode,
   RefreshCw,
   Search,
   Sparkles,
@@ -39,6 +44,7 @@ import {
   ToggleRight,
   Trash2,
   User,
+  Users,
 } from 'lucide-react';
 
 /**
@@ -105,10 +111,30 @@ export default function AdminJadwalUjianPage() {
   // State Filter & Paginasi untuk Detail Jadwal Ujian
   const [detailExamId, setDetailExamId] = useState<string | null>(null);
   const [detailExamTitle, setDetailExamTitle] = useState<string>('');
+  const [detailSubTab, setDetailSubTab] = useState<'sessions' | 'kartu'>('sessions');
   const [detailPage, setDetailPage] = useState<number>(1);
   const [detailLimit, setDetailLimit] = useState<number>(20);
   const [detailFilterKelas, setDetailFilterKelas] = useState<string>('ALL');
   const [detailSearch, setDetailSearch] = useState<string>('');
+
+  // State Filter & Paginasi untuk Kartu Ujian
+  const [kartuPage, setKartuPage] = useState<number>(1);
+  const [kartuLimit, setKartuLimit] = useState<number>(20);
+  const [kartuFilterRuangan, setKartuFilterRuangan] = useState<string>('ALL');
+  const [kartuFilterKelas, setKartuFilterKelas] = useState<string>('ALL');
+  const [kartuSearch, setKartuSearch] = useState<string>('');
+
+  // State Modal Dialog Kartu Ujian
+  const [isGenerateKartuOpen, setIsGenerateKartuOpen] = useState<boolean>(false);
+  const [generateKapasitas, setGenerateKapasitas] = useState<number>(20);
+  const [generateKolom, setGenerateKolom] = useState<number>(4);
+  const [isResetKartuOpen, setIsResetKartuOpen] = useState<boolean>(false);
+  const [isDownloadLabelOpen, setIsDownloadLabelOpen] = useState<boolean>(false);
+  const [downloadLabelRuangan, setDownloadLabelRuangan] = useState<string>('ALL');
+  const [isDownloadKartuBatchOpen, setIsDownloadKartuBatchOpen] = useState<boolean>(false);
+  const [downloadKartuBatchRuangan, setDownloadKartuBatchRuangan] = useState<string>('ALL');
+  const [downloadKartuBatchKelas, setDownloadKartuBatchKelas] = useState<string>('ALL');
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
   // State Konfirmasi Hapus
   const [examToDelete, setExamToDelete] = useState<{
@@ -117,6 +143,7 @@ export default function AdminJadwalUjianPage() {
     totalItems: number;
     isActive: boolean;
   } | null>(null);
+
 
   // 1. Query Daftar Tahun Ajaran
   const { data: tahunList = [] } = useQuery<TahunAjaran[]>({
@@ -196,6 +223,113 @@ export default function AdminJadwalUjianPage() {
     enabled: !!detailExamId && activeTab === 'detail',
   });
 
+  // 6. Query Ringkasan Kartu Ujian (Daftar Ruangan, Total Peserta)
+  const {
+    data: kartuSummary,
+    isLoading: isKartuSummaryLoading,
+    refetch: refetchKartuSummary,
+  } = useQuery<KartuUjianSummary>({
+    queryKey: ['kartu-ujian-summary', detailExamId],
+    queryFn: async () => {
+      if (!detailExamId) return null;
+      const res = await api.get(`/jadwal/ujian/${detailExamId}/kartu/summary`);
+      return res.data?.data ?? res.data;
+    },
+    enabled: !!detailExamId && activeTab === 'detail',
+  });
+
+  // 7. Query Daftar Kartu Ujian Siswa (Paginasi & Filter)
+  const {
+    data: kartuData,
+    isLoading: isKartuListLoading,
+    refetch: refetchKartuList,
+  } = useQuery<{ items: KartuUjian[]; meta: { total: number; page: number; limit: number; totalPages: number } }>({
+    queryKey: ['kartu-ujian-list', detailExamId, kartuPage, kartuLimit, kartuFilterRuangan, kartuFilterKelas, kartuSearch],
+    queryFn: async () => {
+      if (!detailExamId) return null;
+      const params = new URLSearchParams({
+        page: String(kartuPage),
+        limit: String(kartuLimit),
+      });
+      if (kartuFilterRuangan && kartuFilterRuangan !== 'ALL') {
+        params.append('ruangan', kartuFilterRuangan);
+      }
+      if (kartuFilterKelas && kartuFilterKelas !== 'ALL') {
+        params.append('kelas_id', kartuFilterKelas);
+      }
+      if (kartuSearch.trim()) {
+        params.append('search', kartuSearch.trim());
+      }
+      const res = await api.get(`/jadwal/ujian/${detailExamId}/kartu?${params.toString()}`);
+      return res.data?.data ?? res.data;
+    },
+    enabled: !!detailExamId && activeTab === 'detail' && detailSubTab === 'kartu',
+  });
+
+  // Mutasi Generate / Tambah Kartu Ujian
+  const generateKartuMutation = useMutation({
+    mutationFn: async () => {
+      if (!detailExamId) throw new Error('ID Ujian tidak valid');
+      const res = await api.post(`/jadwal/ujian/${detailExamId}/kartu/generate`, {
+        kapasitas_ruangan: generateKapasitas,
+        kolom_per_baris: generateKolom,
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setIsGenerateKartuOpen(false);
+      refetchKartuSummary();
+      refetchKartuList();
+      toast.success('Kartu ujian berhasil diproses', data?.message || 'Nomor ruang dan kursi telah ditetapkan');
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Gagal generate kartu ujian';
+      toast.error('Gagal generate kartu ujian', msg);
+    },
+  });
+
+  // Mutasi Reset Kartu Ujian
+  const resetKartuMutation = useMutation({
+    mutationFn: async () => {
+      if (!detailExamId) throw new Error('ID Ujian tidak valid');
+      const res = await api.delete(`/jadwal/ujian/${detailExamId}/kartu`);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setIsResetKartuOpen(false);
+      refetchKartuSummary();
+      refetchKartuList();
+      toast.success('Kartu ujian berhasil direset', data?.message || 'Data kursi telah dikosongkan');
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Gagal mereset kartu ujian';
+      toast.error('Gagal mereset kartu ujian', msg);
+    },
+  });
+
+  // Helper Pengunduhan Dokumen PDF
+  const handleDownloadPdf = async (url: string, filename: string) => {
+    try {
+      setIsDownloadingPdf(true);
+      toast.info('Menyiapkan berkas PDF...', 'Proses kompilasi dokumen sedang berlangsung');
+      const res = await api.get(url, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success('Berkas PDF berhasil diunduh');
+    } catch (err: any) {
+      toast.error('Gagal mengunduh berkas PDF', err?.message || 'Terjadi gangguan jaringan');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   // Otomatis update Tanggal Selesai Ujian saat Tanggal Mulai atau Sesi berubah
   useEffect(() => {
     if (examTanggalMulai) {
@@ -215,10 +349,16 @@ export default function AdminJadwalUjianPage() {
     setDetailExamId(id);
     setDetailExamTitle(nama || '');
     setDetailPage(1);
+    setKartuPage(1);
     setDetailFilterKelas('ALL');
+    setKartuFilterRuangan('ALL');
+    setKartuFilterKelas('ALL');
     setDetailSearch('');
+    setKartuSearch('');
+    setDetailSubTab('sessions');
     setActiveTab('detail');
   };
+
 
   // Mutasi Generate Preview Jadwal Ujian
   const generateExamPreviewMutation = useMutation({
@@ -1287,119 +1427,699 @@ export default function AdminJadwalUjianPage() {
               </div>
             </div>
 
-            {/* Filter & Pencarian Cepat */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
-              <div className="flex flex-wrap items-center gap-3 flex-1">
-                <div className="w-full sm:w-60">
-                  <Select
-                    value={detailFilterKelas}
-                    onChange={(e) => {
-                      setDetailFilterKelas(e.target.value);
-                      setDetailPage(1);
-                    }}
-                    options={[
-                      { label: `Semua Kelas (${kelasList.length})`, value: 'ALL' },
-                      ...kelasList.map((k) => ({
-                        label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
-                        value: k.id,
-                      })),
-                    ]}
-                  />
-                </div>
+            {/* Sub-Tab Switcher: Sesi Jadwal Pelajaran vs Kartu Ujian & Nomor Kursi */}
+            <div className="flex items-center gap-2 border-b border-border pb-1">
+              <button
+                type="button"
+                onClick={() => setDetailSubTab('sessions')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg transition-all duration-150',
+                  detailSubTab === 'sessions'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover',
+                )}
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Sesi Mata Pelajaran</span>
+                <span
+                  className={cn(
+                    'px-1.5 py-0.5 text-[10px] font-bold rounded-full',
+                    detailSubTab === 'sessions' ? 'bg-white/20 text-white' : 'bg-surface-hover text-foreground-muted',
+                  )}
+                >
+                  {detailData.meta?.total || 0}
+                </span>
+              </button>
 
-                <div className="w-36">
-                  <Select
-                    value={String(detailLimit)}
-                    onChange={(e) => {
-                      setDetailLimit(Number(e.target.value));
-                      setDetailPage(1);
-                    }}
-                    options={[
-                      { label: '10 / halaman', value: '10' },
-                      { label: '20 / halaman', value: '20' },
-                      { label: '50 / halaman', value: '50' },
-                      { label: '100 / halaman', value: '100' },
-                    ]}
-                  />
-                </div>
-              </div>
-
-              {/* Kotak Pencarian */}
-              <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-foreground-muted pointer-events-none" />
-                <Input
-                  value={detailSearch}
-                  onChange={(e) => {
-                    setDetailSearch(e.target.value);
-                    setDetailPage(1);
-                  }}
-                  placeholder="Cari mapel, guru, ruangan..."
-                  className="pl-9"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setDetailSubTab('kartu')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg transition-all duration-150',
+                  detailSubTab === 'kartu'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover',
+                )}
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>Kartu Peserta & Nomor Kursi</span>
+                <span
+                  className={cn(
+                    'px-1.5 py-0.5 text-[10px] font-bold rounded-full',
+                    detailSubTab === 'kartu' ? 'bg-white/20 text-white' : 'bg-surface-hover text-foreground-muted',
+                  )}
+                >
+                  {kartuSummary?.total_peserta || 0}
+                </span>
+              </button>
             </div>
 
-            {/* Tabel Detail Terpaginasi */}
-            <div className="border border-border rounded-xl bg-surface overflow-hidden">
-              {(detailData.items || []).length === 0 ? (
-                <div className="py-12 text-center text-foreground-muted">
-                  <p className="text-xs font-semibold text-foreground">Tidak ada data sesi ujian</p>
-                  <p className="text-xs text-foreground-muted mt-1">Coba sesuaikan filter kelas atau kata kunci pencarian</p>
-                </div>
-              ) : (
-                <div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">No</TableHead>
-                        <TableHead className="w-36">Tanggal & Jam</TableHead>
-                        <TableHead>Mata Pelajaran</TableHead>
-                        <TableHead>Kelas</TableHead>
-                        <TableHead>Ruangan</TableHead>
-                        <TableHead>Pengawas</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(detailData.items || []).map((it: any, idx: number) => {
-                        const rowNum = (detailData.meta?.page - 1) * detailData.meta?.limit + idx + 1;
-                        return (
-                          <TableRow key={it.id || idx}>
-                            <TableCell className="text-foreground-muted text-xs">{rowNum}</TableCell>
-                            <TableCell>
-                              <div className="text-xs font-semibold text-foreground">{it.tanggal}</div>
-                              <div className="font-mono text-xs text-primary">{it.jam_mulai} - {it.jam_selesai}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-xs font-bold text-foreground">{it.mapel_nama}</div>
-                              <div className="text-[11px] font-mono text-foreground-muted">{it.mapel_kode}</div>
-                            </TableCell>
-                            <TableCell className="text-xs font-medium text-foreground">{it.kelas_nama}</TableCell>
-                            <TableCell className="text-xs font-mono text-foreground">{it.ruangan || '-'}</TableCell>
-                            <TableCell className="text-xs text-foreground-muted">{it.guru_nama || '-'}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+            {/* KONTEN SUB-TAB 1: SESI MATA PELAJARAN */}
+            {detailSubTab === 'sessions' && (
+              <div className="space-y-4 animate-in fade-in-50 duration-200">
+                {/* Filter & Pencarian Cepat */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
+                  <div className="flex flex-wrap items-center gap-3 flex-1">
+                    <div className="w-full sm:w-60">
+                      <Select
+                        value={detailFilterKelas}
+                        onChange={(e) => {
+                          setDetailFilterKelas(e.target.value);
+                          setDetailPage(1);
+                        }}
+                        options={[
+                          { label: `Semua Kelas (${kelasList.length})`, value: 'ALL' },
+                          ...kelasList.map((k) => ({
+                            label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
+                            value: k.id,
+                          })),
+                        ]}
+                      />
+                    </div>
 
-                  {/* Kontrol Navigasi Paginasi Standar */}
-                  <div className="p-4 border-t border-border/60 bg-surface">
-                    <Pagination
-                      currentPage={detailData.meta?.page || detailPage}
-                      totalPages={detailData.meta?.totalPages || 1}
-                      totalItems={detailData.meta?.total || 0}
-                      pageSize={detailData.meta?.limit || detailLimit}
-                      onPageChange={(page) => setDetailPage(page)}
-                      itemLabel="sesi ujian"
-                      hideOnSinglePage={false}
+                    <div className="w-36">
+                      <Select
+                        value={String(detailLimit)}
+                        onChange={(e) => {
+                          setDetailLimit(Number(e.target.value));
+                          setDetailPage(1);
+                        }}
+                        options={[
+                          { label: '10 / halaman', value: '10' },
+                          { label: '20 / halaman', value: '20' },
+                          { label: '50 / halaman', value: '50' },
+                          { label: '100 / halaman', value: '100' },
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Kotak Pencarian */}
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-foreground-muted pointer-events-none" />
+                    <Input
+                      value={detailSearch}
+                      onChange={(e) => {
+                        setDetailSearch(e.target.value);
+                        setDetailPage(1);
+                      }}
+                      placeholder="Cari mapel, guru, ruangan..."
+                      className="pl-9"
                     />
                   </div>
                 </div>
-              )}
-            </div>
+
+                {/* Tabel Detail Terpaginasi */}
+                <div className="border border-border rounded-xl bg-surface overflow-hidden">
+                  {(detailData.items || []).length === 0 ? (
+                    <div className="py-12 text-center text-foreground-muted">
+                      <p className="text-xs font-semibold text-foreground">Tidak ada data sesi ujian</p>
+                      <p className="text-xs text-foreground-muted mt-1">Coba sesuaikan filter kelas atau kata kunci pencarian</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">No</TableHead>
+                            <TableHead className="w-36">Tanggal & Jam</TableHead>
+                            <TableHead>Mata Pelajaran</TableHead>
+                            <TableHead>Kelas</TableHead>
+                            <TableHead>Ruangan</TableHead>
+                            <TableHead>Pengawas</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(detailData.items || []).map((it: any, idx: number) => {
+                            const rowNum = (detailData.meta?.page - 1) * detailData.meta?.limit + idx + 1;
+                            return (
+                              <TableRow key={it.id || idx}>
+                                <TableCell className="text-foreground-muted text-xs">{rowNum}</TableCell>
+                                <TableCell>
+                                  <div className="text-xs font-semibold text-foreground">{it.tanggal}</div>
+                                  <div className="font-mono text-xs text-primary">{it.jam_mulai} - {it.jam_selesai}</div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="text-xs font-bold text-foreground">{it.mapel_nama}</div>
+                                  <div className="text-[11px] font-mono text-foreground-muted">{it.mapel_kode}</div>
+                                </TableCell>
+                                <TableCell className="text-xs font-medium text-foreground">{it.kelas_nama}</TableCell>
+                                <TableCell className="text-xs font-mono text-foreground">{it.ruangan || '-'}</TableCell>
+                                <TableCell className="text-xs text-foreground-muted">{it.guru_nama || '-'}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+
+                      {/* Kontrol Navigasi Paginasi Standar */}
+                      <div className="p-4 border-t border-border/60 bg-surface">
+                        <Pagination
+                          currentPage={detailData.meta?.page || detailPage}
+                          totalPages={detailData.meta?.totalPages || 1}
+                          totalItems={detailData.meta?.total || 0}
+                          pageSize={detailData.meta?.limit || detailLimit}
+                          onPageChange={(page) => setDetailPage(page)}
+                          itemLabel="sesi ujian"
+                          hideOnSinglePage={false}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* KONTEN SUB-TAB 2: KARTU PESERTA & NOMOR KURSI */}
+            {detailSubTab === 'kartu' && (
+              <div className="space-y-4 animate-in fade-in-50 duration-200">
+                {/* Banner Ringkasan & Tombol Aksi Utama */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5">
+                  <div className="p-4 rounded-xl border border-border bg-surface flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-foreground-muted font-medium">Total Peserta</div>
+                      <div className="text-lg font-bold text-foreground">
+                        {kartuSummary?.total_peserta || 0} <span className="text-xs font-normal text-foreground-muted">Siswa</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border bg-surface flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
+                      <LayoutGrid className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-foreground-muted font-medium">Ruang Ujian</div>
+                      <div className="text-lg font-bold text-foreground">
+                        {kartuSummary?.total_ruangan || 0} <span className="text-xs font-normal text-foreground-muted">Ruangan</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border bg-surface flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-foreground-muted font-medium">Kapasitas Kursi</div>
+                      <div className="text-lg font-bold text-foreground">
+                        20 <span className="text-xs font-normal text-foreground-muted">Siswa / Ruang</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tombol Aksi Cepat */}
+                  <div className="p-4 rounded-xl border border-border bg-surface flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => setIsGenerateKartuOpen(true)}
+                      className="w-full gap-1.5 text-xs font-bold"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>{kartuSummary?.total_peserta ? 'Tambah / Sinkron' : 'Generate Kartu'}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Toolbar Filter, Pencarian, & Aksi Cetak PDF */}
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-surface p-4 rounded-xl border border-border">
+                  <div className="flex flex-wrap items-center gap-3 flex-1">
+                    <div className="w-full sm:w-44">
+                      <Select
+                        value={kartuFilterRuangan}
+                        onChange={(e) => {
+                          setKartuFilterRuangan(e.target.value);
+                          setKartuPage(1);
+                        }}
+                        options={[
+                          { label: 'Semua Ruang', value: 'ALL' },
+                          ...(kartuSummary?.ruangan_list || []).map((r) => ({
+                            label: `${r.ruangan} (${r.total_siswa} siswa)`,
+                            value: r.ruangan,
+                          })),
+                        ]}
+                      />
+                    </div>
+
+                    <div className="w-full sm:w-52">
+                      <Select
+                        value={kartuFilterKelas}
+                        onChange={(e) => {
+                          setKartuFilterKelas(e.target.value);
+                          setKartuPage(1);
+                        }}
+                        options={[
+                          { label: `Semua Kelas Asal (${kelasList.length})`, value: 'ALL' },
+                          ...kelasList.map((k) => ({
+                            label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
+                            value: k.id,
+                          })),
+                        ]}
+                      />
+                    </div>
+
+                    <div className="w-32">
+                      <Select
+                        value={String(kartuLimit)}
+                        onChange={(e) => {
+                          setKartuLimit(Number(e.target.value));
+                          setKartuPage(1);
+                        }}
+                        options={[
+                          { label: '10 / baris', value: '10' },
+                          { label: '20 / baris', value: '20' },
+                          { label: '50 / baris', value: '50' },
+                          { label: '100 / baris', value: '100' },
+                        ]}
+                      />
+                    </div>
+
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="w-4 h-4 absolute left-3 top-3 text-foreground-muted pointer-events-none" />
+                      <Input
+                        value={kartuSearch}
+                        onChange={(e) => {
+                          setKartuSearch(e.target.value);
+                          setKartuPage(1);
+                        }}
+                        placeholder="Cari siswa, NISN, kursi..."
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tombol Cetak Dokumen PDF */}
+                  <div className="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-border">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsDownloadLabelOpen(true)}
+                      disabled={!kartuSummary?.total_peserta || isDownloadingPdf}
+                      className="gap-1.5 text-xs font-semibold"
+                    >
+                      <Printer className="w-4 h-4 text-primary" />
+                      <span>Label Meja (A4)</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsDownloadKartuBatchOpen(true)}
+                      disabled={!kartuSummary?.total_peserta || isDownloadingPdf}
+                      className="gap-1.5 text-xs font-semibold"
+                    >
+                      <FileText className="w-4 h-4 text-secondary" />
+                      <span>Kartu Peserta (PDF)</span>
+                    </Button>
+
+                    {kartuSummary?.total_peserta ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setIsResetKartuOpen(true)}
+                        className="text-xs text-danger hover:bg-danger-light/30 px-2.5"
+                        title="Reset seluruh nomor kursi dan kartu"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Tabel Kartu Ujian */}
+                <div className="border border-border rounded-xl bg-surface overflow-hidden">
+                  {isKartuListLoading ? (
+                    <div className="p-6 space-y-3">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-4">
+                          <Skeleton className="h-4 w-28 rounded" />
+                          <Skeleton className="h-4 w-48 rounded" />
+                          <Skeleton className="h-4 w-24 rounded" />
+                          <Skeleton className="h-7 w-20 rounded" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (kartuData?.items || []).length === 0 ? (
+                    <div className="py-14 text-center text-foreground-muted space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center mx-auto text-foreground-muted">
+                        <GraduationCap className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-semibold text-foreground">Belum ada data nomor kartu / kursi ujian</p>
+                      <p className="text-xs text-foreground-muted max-w-md mx-auto">
+                        Klik tombol <strong>Generate Kartu</strong> untuk mengalokasikan siswa dari Kelas 10, 11, 12 ke dalam ruang ujian (20 peserta/ruangan).
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">No</TableHead>
+                            <TableHead className="w-32">No. Peserta</TableHead>
+                            <TableHead className="w-28">Ruangan</TableHead>
+                            <TableHead className="w-24">No. Kursi</TableHead>
+                            <TableHead>Nama Peserta</TableHead>
+                            <TableHead className="w-32">NISN</TableHead>
+                            <TableHead className="w-36">Kelas Asal</TableHead>
+                            <TableHead className="w-28 text-right">Aksi</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(kartuData?.items || []).map((card: KartuUjian, idx: number) => {
+                            const rowNum = ((kartuData?.meta?.page ?? kartuPage) - 1) * (kartuData?.meta?.limit ?? kartuLimit) + idx + 1;
+                            return (
+                              <TableRow key={card.id || idx}>
+                                <TableCell className="text-foreground-muted text-xs">{rowNum}</TableCell>
+                                <TableCell>
+                                  <span className="font-mono text-xs font-semibold text-primary px-1.5 py-0.5 rounded bg-primary/10">
+                                    {card.nomor_peserta}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs font-medium">
+                                    {card.ruangan}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded font-bold text-xs bg-primary text-white font-mono shadow-xs">
+                                    {card.nomor_kursi}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-xs font-bold text-foreground">
+                                  {card.siswa_nama}
+                                </TableCell>
+                                <TableCell className="text-xs font-mono text-foreground-muted">
+                                  {card.siswa_nisn}
+                                </TableCell>
+                                <TableCell className="text-xs font-medium text-foreground">
+                                  {card.kelas_nama}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDownloadPdf(
+                                        `/jadwal/ujian/${detailExamId}/kartu/pdf?siswa_id=${card.siswa_id}`,
+                                        `kartu-ujian-${card.siswa_nisn}.pdf`,
+                                      )
+                                    }
+                                    disabled={isDownloadingPdf}
+                                    className="gap-1 text-xs text-primary hover:bg-primary/10"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>Unduh</span>
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+
+                      {/* Pagination Kartu Ujian */}
+                      <div className="p-4 border-t border-border/60 bg-surface">
+                        <Pagination
+                          currentPage={kartuData?.meta?.page || kartuPage}
+                          totalPages={kartuData?.meta?.totalPages || 1}
+                          totalItems={kartuData?.meta?.total || 0}
+                          pageSize={kartuData?.meta?.limit || kartuLimit}
+                          onPageChange={(page) => setKartuPage(page)}
+                          itemLabel="peserta ujian"
+                          hideOnSinglePage={false}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : null
       )}
+
+      {/* DIALOG GENERATE KARTU UJIAN */}
+      <Dialog
+        isOpen={isGenerateKartuOpen}
+        onClose={() => setIsGenerateKartuOpen(false)}
+        title="Generate Alokasi Ruang & Nomor Kursi Ujian"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl border border-primary/20 bg-primary-light/20 flex items-start gap-3">
+            <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs text-foreground">
+              <p className="font-bold">Aturan Penataan Kursi & Ruangan:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-foreground-muted">
+                <li>Siswa diurutkan mulai dari jenjang Kelas 10, lalu 11, dan 12.</li>
+                <li>Satu ruang ujian berkapasitas 20 peserta (format kursi: A1, A2, B1, B2...).</li>
+                <li>Jika satu kelas melebihi kapasitas ruang, sisa siswa lanjut ke ruangan berikutnya.</li>
+                <li>Sistem bersifat aditif: siswa yang telah punya nomor kursi tidak akan diubah/di-reset.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Kapasitas Siswa per Ruangan
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={generateKapasitas}
+                onChange={(e) => setGenerateKapasitas(Math.max(1, Number(e.target.value)))}
+              />
+              <p className="text-[11px] text-foreground-muted">Default: 20 peserta per ruang ujian</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Jumlah Kolom Kursi per Baris
+              </label>
+              <Select
+                value={String(generateKolom)}
+                onChange={(e) => setGenerateKolom(Number(e.target.value))}
+                options={[
+                  { label: '4 Kolom (A1..A4, B1..B4)', value: '4' },
+                  { label: '5 Kolom (A1..A5, B1..B5)', value: '5' },
+                  { label: '6 Kolom (A1..A6, B1..B6)', value: '6' },
+                ]}
+              />
+              <p className="text-[11px] text-foreground-muted">Format label baris (A, B, C...) & kolom (1, 2...)</p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsGenerateKartuOpen(false)}
+              disabled={generateKartuMutation.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => generateKartuMutation.mutate()}
+              isLoading={generateKartuMutation.isPending}
+              className="gap-1.5 font-bold"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Generate Sekarang</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* DIALOG CETAK LABEL MEJA (A4 MULTI-LABEL) */}
+      <Dialog
+        isOpen={isDownloadLabelOpen}
+        onClose={() => setIsDownloadLabelOpen(false)}
+        title="Cetak Label Meja / Denah Kursi (Kertas A4)"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl border border-border bg-surface-hover flex items-start gap-3">
+            <Printer className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="text-xs text-foreground-muted leading-relaxed">
+              Dokumen dicetak di atas <strong>Kertas A4</strong> dengan format <strong>6 label per lembar</strong> (~9.0 cm x 8.5 cm) lengkap dengan garis potong putus-putus. Ukuran sangat ideal untuk ditempel di bangku ujian.
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">
+              Pilih Ruang Ujian
+            </label>
+            <Select
+              value={downloadLabelRuangan}
+              onChange={(e) => setDownloadLabelRuangan(e.target.value)}
+              options={[
+                { label: `Semua Ruangan (${kartuSummary?.total_ruangan || 0} Ruangan)`, value: 'ALL' },
+                ...(kartuSummary?.ruangan_list || []).map((r) => ({
+                  label: `${r.ruangan} (${r.total_siswa} peserta)`,
+                  value: r.ruangan,
+                })),
+              ]}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDownloadLabelOpen(false)}
+            >
+              Tutup
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                const url = `/jadwal/ujian/${detailExamId}/label-kursi/pdf?ruangan=${downloadLabelRuangan}`;
+                const filename = `label-meja-${downloadLabelRuangan === 'ALL' ? 'semua-ruang' : downloadLabelRuangan}.pdf`;
+                setIsDownloadLabelOpen(false);
+                handleDownloadPdf(url, filename);
+              }}
+              disabled={isDownloadingPdf}
+              className="gap-1.5 font-bold"
+            >
+              <Download className="w-4 h-4" />
+              <span>Unduh PDF Label Meja</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* DIALOG CETAK KARTU UJIAN BATCH (A5 LANDSCAPE) */}
+      <Dialog
+        isOpen={isDownloadKartuBatchOpen}
+        onClose={() => setIsDownloadKartuBatchOpen(false)}
+        title="Cetak Kartu Tanda Peserta Ujian (PDF)"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl border border-border bg-surface-hover flex items-start gap-3">
+            <FileText className="w-5 h-5 text-secondary shrink-0 mt-0.5" />
+            <div className="text-xs text-foreground-muted leading-relaxed">
+              Dokumen berisi Kartu Peserta Ujian berukuran <strong>A5 Landscape</strong> per peserta, lengkap dengan KOP Sekolah, Biodata Siswa, Ruangan, Nomor Meja, serta Jadwal Sesi Pelajaran.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Filter Berdasarkan Ruangan
+              </label>
+              <Select
+                value={downloadKartuBatchRuangan}
+                onChange={(e) => setDownloadKartuBatchRuangan(e.target.value)}
+                options={[
+                  { label: 'Semua Ruangan', value: 'ALL' },
+                  ...(kartuSummary?.ruangan_list || []).map((r) => ({
+                    label: `${r.ruangan} (${r.total_siswa} siswa)`,
+                    value: r.ruangan,
+                  })),
+                ]}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Filter Berdasarkan Kelas
+              </label>
+              <Select
+                value={downloadKartuBatchKelas}
+                onChange={(e) => setDownloadKartuBatchKelas(e.target.value)}
+                options={[
+                  { label: 'Semua Kelas', value: 'ALL' },
+                  ...kelasList.map((k) => ({
+                    label: `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
+                    value: k.id,
+                  })),
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDownloadKartuBatchOpen(false)}
+            >
+              Tutup
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                const url = `/jadwal/ujian/${detailExamId}/kartu/pdf?ruangan=${downloadKartuBatchRuangan}&kelas_id=${downloadKartuBatchKelas}`;
+                const filename = `kartu-ujian-batch.pdf`;
+                setIsDownloadKartuBatchOpen(false);
+                handleDownloadPdf(url, filename);
+              }}
+              disabled={isDownloadingPdf}
+              className="gap-1.5 font-bold"
+            >
+              <Download className="w-4 h-4" />
+              <span>Unduh Dokumen PDF</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* DIALOG KONFIRMASI RESET KARTU UJIAN */}
+      <Dialog
+        isOpen={isResetKartuOpen}
+        onClose={() => setIsResetKartuOpen(false)}
+        title="Konfirmasi Reset Kartu Ujian"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3.5 p-4 rounded-xl border border-danger/20 bg-danger-light/30">
+            <div className="p-2 rounded-lg bg-danger text-white shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-sm">
+              <p className="font-bold text-foreground">
+                Apakah Anda yakin ingin mereset nomor kursi ujian?
+              </p>
+              <p className="text-foreground-muted text-xs">
+                Seluruh alokasi ruang ujian dan nomor kursi yang telah ter-generate pada jadwal ini akan dikosongkan. Anda dapat men-generate ulang kapan saja.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsResetKartuOpen(false)}
+              disabled={resetKartuMutation.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => resetKartuMutation.mutate()}
+              isLoading={resetKartuMutation.isPending}
+              className="gap-2 font-bold"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Reset Seluruh Kursi</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* MODAL KONFIRMASI HAPUS JADWAL UJIAN */}
       <Dialog
@@ -1475,3 +2195,4 @@ export default function AdminJadwalUjianPage() {
     </div>
   );
 }
+

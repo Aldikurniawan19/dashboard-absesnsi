@@ -150,3 +150,30 @@ export interface PaginatedResult<T> {
     totalPages: number;
   };
 }
+
+export interface KartuUjian {
+  id: string;
+  jadwal_ujian_id: string;
+  siswa_id: string;
+  kelas_id: string;
+  ruangan: string;
+  nomor_kursi: string;
+  nomor_peserta: string;
+  createdAt: string;
+  siswa_nama?: string;
+  siswa_nisn?: string;
+  kelas_nama?: string;
+  tingkat?: number;
+}
+
+export interface KartuUjianSummary {
+  jadwal_ujian_id: string;
+  total_peserta: number;
+  total_ruangan: number;
+  ruangan_list: Array<{
+    ruangan: string;
+    total_siswa: number;
+    total_kelas: number;
+  }>;
+}
+
