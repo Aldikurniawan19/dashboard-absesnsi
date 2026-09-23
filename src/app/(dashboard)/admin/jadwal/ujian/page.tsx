@@ -313,7 +313,10 @@ export default function AdminJadwalUjianPage() {
       setIsDownloadingPdf(true);
       toast.info('Menyiapkan berkas PDF...', 'Proses kompilasi dokumen sedang berlangsung');
       const res = await api.get(url, { responseType: 'blob' });
-      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const blob =
+        res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data], { type: 'application/pdf' });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
