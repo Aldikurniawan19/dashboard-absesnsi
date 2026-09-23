@@ -19,6 +19,8 @@ import {
   RefreshCw,
   Eye,
   Shield,
+  ShieldCheck,
+  ShieldAlert,
   Filter,
   User,
   Activity,
@@ -26,6 +28,11 @@ import {
   Calendar,
   Globe,
   FileText,
+  Download,
+  UploadCloud,
+  CheckCircle2,
+  AlertTriangle,
+  Lock,
 } from 'lucide-react';
 
 export default function AdminAuditLogPage() {
@@ -37,6 +44,21 @@ export default function AdminAuditLogPage() {
   const [selectedActorType, setSelectedActorType] = useState<string>('ALL');
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
 
+  // Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+
+  // Export Form State
+  const [exportStartDate, setExportStartDate] = useState<string>('');
+  const [exportEndDate, setExportEndDate] = useState<string>('');
+  const [exportResource, setExportResource] = useState<string>('ALL');
+
+  // Verify State
+  const [verifyFile, setVerifyFile] = useState<File | null>(null);
+  const [verifyResult, setVerifyResult] = useState<any | null>(null);
+
   // 1. Query Daftar Modul Resource untuk Filter
   const { data: resourceList = [] } = useQuery<string[]>({
     queryKey: ['audit-log-resources'],
@@ -47,7 +69,7 @@ export default function AdminAuditLogPage() {
     },
   });
 
-  // 2. Query Utama Audit Logs dari Database
+  // 2. Query Utama Audit Logs dari Database (Read-Only)
   const {
     data: auditData,
     isLoading,
@@ -103,6 +125,69 @@ export default function AdminAuditLogPage() {
     setPage(1);
   };
 
+  // Handler Ekspor Berkas Resmi dengan SHA-256 Checksum
+  const handleDownloadOfficialExport = async () => {
+    try {
+      setIsExporting(true);
+      const params: Record<string, any> = {
+        format: 'json',
+      };
+      if (exportStartDate) params.startDate = exportStartDate;
+      if (exportEndDate) params.endDate = exportEndDate;
+      if (exportResource !== 'ALL') params.resource = exportResource;
+
+      const res = await api.get('/audit-logs/export', { params });
+      const exportData = res.data?.data ?? res.data;
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestampStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `Arsip_Resmi_Audit_Log_SMA_${timestampStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsExportModalOpen(false);
+      refetch();
+    } catch (err: any) {
+      alert(`Gagal mengekspor arsip log: ${err?.message || 'Terjadi kesalahan sistem'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Handler Verifikasi File Integritas SHA-256
+  const handleVerifyFile = async () => {
+    if (!verifyFile) return;
+
+    try {
+      setIsVerifying(true);
+      setVerifyResult(null);
+
+      const fileContent = await verifyFile.text();
+      const parsedData = JSON.parse(fileContent);
+
+      const res = await api.post('/audit-logs/verify', {
+        archive_data: parsedData,
+      });
+
+      const result = res.data?.data ?? res.data;
+      setVerifyResult(result);
+    } catch (err: any) {
+      setVerifyResult({
+        valid: false,
+        message: `Berkas tidak valid atau format JSON rusak: ${err.message}`,
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const getActorBadgeVariant = (type: UserRole | string) => {
     switch (type) {
       case 'ADMIN':
@@ -119,7 +204,7 @@ export default function AdminAuditLogPage() {
   const getActionBadgeVariant = (action: string) => {
     const act = action.toUpperCase();
     if (act.includes('LOGIN') || act.includes('AUTH')) return 'info';
-    if (act.includes('CREATE') || act.includes('TAMBAH') || act.includes('GENERATE') || act.includes('APPROVE')) return 'success';
+    if (act.includes('CREATE') || act.includes('TAMBAH') || act.includes('GENERATE') || act.includes('APPROVE') || act.includes('EXPORT')) return 'success';
     if (act.includes('UPDATE') || act.includes('UBAH') || act.includes('EDIT')) return 'warning';
     if (act.includes('DELETE') || act.includes('HAPUS') || act.includes('REJECT') || act.includes('TOLAK') || act.includes('CANCEL')) return 'danger';
     return 'default';
@@ -127,10 +212,59 @@ export default function AdminAuditLogPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Log Aktivitas & Audit Sistem"
-        description="Rekam jejak seluruh aktivitas administratif, autentikasi pengguna, manajemen jadwal, dan perizinan sistem"
-      />
+      {/* Header Utama & Tombol Ekspor/Verifikasi */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <PageHeader
+          title="Log Aktivitas & Audit Sistem"
+          description="Rekam jejak permanen seluruh aktivitas administratif, autentikasi pengguna, manajemen jadwal, dan perizinan"
+        />
+
+        <div className="flex items-center gap-2.5">
+          {/* Tombol Verifikasi Integritas SHA-256 */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setVerifyFile(null);
+              setVerifyResult(null);
+              setIsVerifyModalOpen(true);
+            }}
+            className="text-xs h-9 border-border hover:bg-surface-muted"
+          >
+            <ShieldCheck className="w-4 h-4 mr-1.5 text-primary" />
+            Verifikasi Keaslian Berkas
+          </Button>
+
+          {/* Tombol Ekspor Resmi */}
+          <Button
+            size="sm"
+            onClick={() => setIsExportModalOpen(true)}
+            className="text-xs h-9 bg-primary text-white hover:bg-primary/90"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Ekspor Arsip Resmi
+          </Button>
+        </div>
+      </div>
+
+      {/* Security & Immutability Guarantee Banner */}
+      <div className="p-3.5 bg-primary-light/50 border border-primary/20 rounded-xl flex items-start gap-3 text-xs">
+        <div className="p-1.5 bg-primary/10 rounded-lg text-primary mt-0.5">
+          <Lock className="w-4 h-4" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-foreground">Jaminan Keamanan & Integritas Audit Trail</span>
+            <Badge variant="primary" className="text-[10px] px-1.5 py-0 font-mono">
+              READ-ONLY IMMUTABLE
+            </Badge>
+          </div>
+          <p className="text-foreground-muted mt-0.5 leading-relaxed">
+            Data log sistem bersifat permanen (*append-only*). Seluruh proses ekspor data dilindungi oleh tanda tangan digital
+            **SHA-256 Checksum** untuk menjamin data arsip bebas dari pemalsuan dan manipulasi manual.
+          </p>
+        </div>
+      </div>
 
       {/* Filter & Toolbar */}
       <Card>
@@ -141,7 +275,7 @@ export default function AdminAuditLogPage() {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
               <Input
                 type="text"
-                placeholder="Cari aksi, rincian keterangan, IP..."
+                placeholder="Cari aksi, rincian keterangan, aktor, IP..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-9 h-9 text-xs"
@@ -245,7 +379,7 @@ export default function AdminAuditLogPage() {
               <CardTitle>Riwayat Aktivitas & Keamanan</CardTitle>
             </div>
             <CardDescription className="mt-1">
-              Daftar rekam jejak aksi yang tersimpan di database sistem ({meta.total} rekaman log)
+              Daftar rekam jejak aksi yang tersimpan di database sistem ({meta.total} rekaman log aktif)
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -271,7 +405,7 @@ export default function AdminAuditLogPage() {
                 <TableRow>
                   <TableHead className="w-[180px]">Waktu Kejadian</TableHead>
                   <TableHead className="w-[180px]">Aktor Pelaksana</TableHead>
-                  <TableHead className="w-[140px]">Tindakan Aksi</TableHead>
+                  <TableHead className="w-[150px]">Tindakan Aksi</TableHead>
                   <TableHead className="w-[130px]">Modul Resource</TableHead>
                   <TableHead>Keterangan & Rincian</TableHead>
                   <TableHead className="w-[110px]">Alamat IP</TableHead>
@@ -486,6 +620,219 @@ export default function AdminAuditLogPage() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* Modal Ekspor Arsip Resmi dengan SHA-256 */}
+      <Dialog
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Ekspor Arsip Resmi Audit Log"
+        description="Terbitkan berkas arsip resmi bertanda tangan digital SHA-256 untuk keperluan audit akreditasi dan bukti hukum"
+        maxWidth="md"
+      >
+        <div className="space-y-4 py-2 text-xs">
+          <div className="p-3 bg-primary-light/40 border border-primary/20 rounded-lg space-y-1.5">
+            <div className="flex items-center gap-2 text-primary font-semibold">
+              <Shield className="w-4 h-4" />
+              <span>Proteksi Anti-Manipulasi SHA-256</span>
+            </div>
+            <p className="text-foreground-muted leading-relaxed">
+              Berkas arsip yang diunduh akan memuat sertifikat integritas digital. Jika ada pihak yang memodifikasi isi berkas,
+              sistem akan dapat mendeteksinya secara otomatis.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block font-medium text-foreground mb-1">Rentang Tanggal Mulai (Opsional)</label>
+              <Input
+                type="date"
+                value={exportStartDate}
+                onChange={(e) => setExportStartDate(e.target.value)}
+                className="h-9 text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block font-medium text-foreground mb-1">Rentang Tanggal Akhir (Opsional)</label>
+              <Input
+                type="date"
+                value={exportEndDate}
+                onChange={(e) => setExportEndDate(e.target.value)}
+                className="h-9 text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block font-medium text-foreground mb-1">Filter Modul Resource</label>
+              <select
+                value={exportResource}
+                onChange={(e) => setExportResource(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-surface border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="ALL">Semua Modul</option>
+                {resourceList.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(false)}>
+              Batal
+            </Button>
+            <Button size="sm" onClick={handleDownloadOfficialExport} disabled={isExporting}>
+              {isExporting ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Memproses Hash Digital...
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  Unduh Berkas Arsip (.JSON)
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Modal Verifikasi Keaslian Berkas Arsip */}
+      <Dialog
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+        title="Verifikasi Keaslian Berkas Arsip"
+        description="Unggah berkas arsip audit log untuk memvalidasi integritas data terhadap tanda tangan digital SHA-256"
+        maxWidth="lg"
+      >
+        <div className="space-y-4 py-2 text-xs">
+          {/* File Selector */}
+          <div className="border-2 border-dashed border-border rounded-xl p-5 text-center bg-surface-muted/40 hover:bg-surface-muted transition-colors">
+            <UploadCloud className="w-8 h-8 text-primary mx-auto mb-2 opacity-80" />
+            <p className="font-semibold text-foreground mb-1">
+              {verifyFile ? verifyFile.name : 'Pilih Berkas Arsip Audit Log (.JSON)'}
+            </p>
+            <p className="text-foreground-muted text-[11px] mb-3">
+              {verifyFile
+                ? `Ukuran: ${(verifyFile.size / 1024).toFixed(1)} KB`
+                : 'Berkas resmi yang sebelumnya diekspor dari sistem'}
+            </p>
+
+            <label className="inline-block">
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setVerifyFile(e.target.files[0]);
+                    setVerifyResult(null);
+                  }
+                }}
+              />
+              <span className="px-3.5 py-1.5 bg-surface border border-border text-foreground hover:bg-background rounded-md text-xs font-medium cursor-pointer transition-colors shadow-sm">
+                Pilih Berkas JSON
+              </span>
+            </label>
+          </div>
+
+          {verifyFile && !verifyResult && (
+            <div className="flex justify-center">
+              <Button size="sm" onClick={handleVerifyFile} disabled={isVerifying} className="h-9 px-4">
+                {isVerifying ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    Menghitung Checksum SHA-256...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
+                    Verifikasi Integritas Sekarang
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Verification Result Display */}
+          {verifyResult && (
+            <div
+              className={`p-4 rounded-xl border space-y-3 ${
+                verifyResult.valid
+                  ? 'bg-success-light/30 border-success/30'
+                  : 'bg-danger-light/30 border-danger/30'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                {verifyResult.valid ? (
+                  <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6 text-danger flex-shrink-0" />
+                )}
+                <div>
+                  <h4
+                    className={`font-bold text-sm ${
+                      verifyResult.valid ? 'text-success' : 'text-danger'
+                    }`}
+                  >
+                    {verifyResult.valid
+                      ? 'BERKAS ARSIP TERVERIFIKASI 100% ASLI'
+                      : 'PERINGATAN: BERKAS TELAH DIMANIPULASI / RUSAK!'}
+                  </h4>
+                  <p className="text-[11.5px] text-foreground-muted mt-0.5">
+                    {verifyResult.message}
+                  </p>
+                </div>
+              </div>
+
+              {verifyResult.sekolah && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2 border-t border-border/50 text-[11px]">
+                  <div>
+                    <span className="text-foreground-muted block">Sekolah Penerbit:</span>
+                    <span className="font-semibold text-foreground">
+                      {verifyResult.sekolah.nama} ({verifyResult.sekolah.npsn})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-foreground-muted block">Total Rekaman Data:</span>
+                    <span className="font-semibold text-foreground">
+                      {verifyResult.total_rekaman} entri log
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-foreground-muted block">Waktu Penerbitan:</span>
+                    <span className="font-semibold text-foreground">
+                      {formatTanggal(new Date(verifyResult.waktu_ekspor))}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {verifyResult.calculated_checksum && (
+                <div className="p-2.5 bg-surface/80 rounded-lg border border-border/60 text-[10.5px] font-mono space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-foreground-muted">Calculated SHA-256 Digest:</span>
+                    <span className="text-foreground select-all break-all">{verifyResult.calculated_checksum}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-muted">Signature Asli Berkas:</span>
+                    <span className="text-foreground select-all break-all">{verifyResult.original_checksum}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2 border-t border-border">
+            <Button variant="outline" size="sm" onClick={() => setIsVerifyModalOpen(false)}>
+              Tutup
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   );
