@@ -324,7 +324,25 @@ export default function AdminJadwalUjianPage() {
       window.URL.revokeObjectURL(downloadUrl);
       toast.success('Berkas PDF berhasil diunduh');
     } catch (err: any) {
-      toast.error('Gagal mengunduh berkas PDF', err?.message || 'Terjadi gangguan jaringan');
+      let errorMsg = 'Terjadi gangguan koneksi atau server';
+      try {
+        if (err?.response?.data instanceof Blob) {
+          const text = await err.response.data.text();
+          try {
+            const parsed = JSON.parse(text);
+            errorMsg = parsed.message || parsed.error || text;
+          } catch {
+            errorMsg = text || err?.message || 'Gagal memproses berkas PDF';
+          }
+        } else if (err?.response?.data?.message) {
+          errorMsg = err.response.data.message;
+        } else if (err?.message) {
+          errorMsg = err.message;
+        }
+      } catch {
+        errorMsg = err?.message || 'Gagal memproses berkas PDF';
+      }
+      toast.error('Gagal mengunduh berkas PDF', errorMsg);
     } finally {
       setIsDownloadingPdf(false);
     }
