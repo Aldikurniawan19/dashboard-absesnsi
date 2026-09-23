@@ -670,22 +670,10 @@ export default function AdminJadwalPage() {
             <Button
               variant={examList.some((e: any) => e.is_active) ? 'secondary' : 'outline'}
               size="md"
-              onClick={() => {
-                setExamActiveTab('list');
-                if (!examTanggalMulai) {
-                  const today = new Date();
-                  const yyyy = today.getFullYear();
-                  const mm = String(today.getMonth() + 1).padStart(2, '0');
-                  const dd = String(today.getDate()).padStart(2, '0');
-                  const todayStr = `${yyyy}-${mm}-${dd}`;
-                  setExamTanggalMulai(todayStr);
-                  setExamTanggalSelesai(calculateExamEndDate(todayStr, examSesiPerHari, mapelList.length));
-                }
-                setIsExamModalOpen(true);
-              }}
+              onClick={() => router.push('/admin/jadwal/ujian')}
               className="gap-2"
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              <GraduationCap className="w-4 h-4" />
               <span>Jadwal Ujian</span>
               {examList.some((e: any) => e.is_active) && (
                 <span className="ml-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-warning text-white uppercase tracking-wider">

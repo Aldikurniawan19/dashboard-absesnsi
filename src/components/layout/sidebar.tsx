@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen,
   Calendar,
+  ChevronDown,
   Clock,
   FileCheck2,
   FileSpreadsheet,
@@ -21,11 +22,19 @@ import {
   Users,
 } from 'lucide-react';
 
+interface SubNavItem {
+  href: string;
+  label: string;
+  icon?: React.ReactNode;
+  badge?: string;
+}
+
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
   badge?: string;
+  children?: SubNavItem[];
 }
 
 interface NavGroup {
@@ -36,6 +45,23 @@ interface NavGroup {
 export function Sidebar() {
   const pathname = usePathname();
   const { user, isGuru, isAdmin, isWaliKelas, logout } = useAuth();
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
+    '/admin/jadwal': true,
+  });
+
+  // Otomatis buka submenu jika route saat ini berada di dalamnya
+  useEffect(() => {
+    if (pathname.startsWith('/admin/jadwal')) {
+      setOpenSubmenus((prev) => ({ ...prev, '/admin/jadwal': true }));
+    }
+  }, [pathname]);
+
+  const toggleSubmenu = (key: string) => {
+    setOpenSubmenus((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   // Menu Admin dikelompokkan berdasarkan fungsi
   const adminGroups: NavGroup[] = [
@@ -50,7 +76,23 @@ export function Sidebar() {
       items: [
         { href: '/admin/tahun-ajaran', label: 'Tahun Ajaran', icon: <Clock className="w-4 h-4" /> },
         { href: '/admin/master-data', label: 'Jurusan, Kelas & Mapel', icon: <BookOpen className="w-4 h-4" /> },
-        { href: '/admin/jadwal', label: 'Jadwal & Deteksi Bentrok', icon: <Calendar className="w-4 h-4" /> },
+        {
+          href: '/admin/jadwal',
+          label: 'Manajemen Jadwal',
+          icon: <Calendar className="w-4 h-4" />,
+          children: [
+            {
+              href: '/admin/jadwal',
+              label: 'Jadwal Pelajaran',
+              icon: <BookOpen className="w-3.5 h-3.5" />,
+            },
+            {
+              href: '/admin/jadwal/ujian',
+              label: 'Jadwal Ujian',
+              icon: <GraduationCap className="w-3.5 h-3.5" />,
+            },
+          ],
+        },
       ],
     },
     {
@@ -118,16 +160,90 @@ export function Sidebar() {
         {group.title}
       </p>
       <nav className="space-y-0.5">
-        {group.items.map((link) => {
+        {group.items.map((item) => {
+          if (item.children && item.children.length > 0) {
+            const isParentActive = pathname.startsWith(item.href);
+            const isOpen = openSubmenus[item.href] ?? isParentActive;
+
+            return (
+              <div key={item.label} className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => toggleSubmenu(item.href)}
+                  className={cn(
+                    'group flex w-full items-center justify-between px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                    isParentActive
+                      ? 'text-primary font-semibold bg-primary-light/40'
+                      : 'text-foreground hover:bg-background hover:text-primary',
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <span className={cn('shrink-0', isParentActive ? 'text-primary' : 'text-foreground-muted group-hover:text-primary')}>
+                      {item.icon}
+                    </span>
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  <ChevronDown
+                    className={cn(
+                      'w-3.5 h-3.5 transition-transform duration-200 text-foreground-muted group-hover:text-primary shrink-0',
+                      isOpen ? 'rotate-180 text-primary' : '',
+                    )}
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="pl-3 space-y-0.5 pt-0.5 border-l-2 border-border/60 ml-4.5 my-1">
+                    {item.children.map((child) => {
+                      const isChildActive =
+                        child.href === '/admin/jadwal'
+                          ? pathname === '/admin/jadwal' || pathname === '/admin/jadwal/buat-otomatis'
+                          : pathname.startsWith(child.href);
+
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={cn(
+                            'group flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
+                            isChildActive
+                              ? 'bg-primary text-white font-semibold shadow-subtle'
+                              : 'text-foreground-muted hover:text-foreground hover:bg-background',
+                          )}
+                        >
+                          {child.icon && (
+                            <span className={cn('shrink-0', isChildActive ? 'text-white' : 'text-foreground-muted group-hover:text-primary')}>
+                              {child.icon}
+                            </span>
+                          )}
+                          <span className="truncate">{child.label}</span>
+                          {child.badge && (
+                            <span
+                              className={cn(
+                                'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded',
+                                isChildActive ? 'bg-white/20 text-white' : 'bg-surface border border-border text-foreground-muted',
+                              )}
+                            >
+                              {child.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const isActive =
-            link.href === '/'
+            item.href === '/'
               ? pathname === '/'
-              : pathname.startsWith(link.href);
+              : pathname.startsWith(item.href);
 
           return (
             <Link
-              key={link.href}
-              href={link.href}
+              key={item.href}
+              href={item.href}
               className={cn(
                 'group flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-md transition-colors',
                 isActive
@@ -136,17 +252,17 @@ export function Sidebar() {
               )}
             >
               <span className={cn('shrink-0', isActive ? 'text-white' : 'text-foreground-muted group-hover:text-primary')}>
-                {link.icon}
+                {item.icon}
               </span>
-              <span className="truncate">{link.label}</span>
-              {link.badge && (
+              <span className="truncate">{item.label}</span>
+              {item.badge && (
                 <span
                   className={cn(
                     'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded',
                     isActive ? 'bg-white/20 text-white' : 'bg-surface border border-border text-foreground-muted',
                   )}
                 >
-                  {link.badge}
+                  {item.badge}
                 </span>
               )}
             </Link>
