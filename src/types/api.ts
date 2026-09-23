@@ -177,3 +177,28 @@ export interface KartuUjianSummary {
   }>;
 }
 
+export interface AuditLogItem {
+  id: string;
+  sekolah_id: string;
+  actor_id: string;
+  actor_name?: string;
+  actor_identifier?: string;
+  actor_type: UserRole;
+  action: string;
+  resource: string;
+  resource_id?: string | null;
+  details?: string | null;
+  ip_address?: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogResponse {
+  data: AuditLogItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+

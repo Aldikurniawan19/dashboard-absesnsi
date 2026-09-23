@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { PageSkeleton } from '@/components/ui/loading-state';
-import { getHariName, formatTanggal } from '@/lib/utils';
+import { getHariName, formatTanggal, formatWaktu } from '@/lib/utils';
 import {
   BookOpen,
   Calendar,
@@ -18,6 +18,7 @@ import {
   Clock,
   FileCheck2,
   GraduationCap,
+  History,
   Layers,
   MapPin,
   Play,
@@ -27,7 +28,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
-import { JadwalPelajaran } from '@/types/api';
+import { AuditLogItem, JadwalPelajaran } from '@/types/api';
 
 export default function DashboardPage() {
   const { user, isGuru, isAdmin, isWaliKelas, isLoading: isLoadingAuth } = useAuth();
@@ -73,6 +74,17 @@ export default function DashboardPage() {
       return Array.isArray(data) ? data : [];
     },
     enabled: (!!isWaliKelas || !!isAdmin) && !isLoadingAuth,
+  });
+
+  // Query Recent Audit Logs (Khusus Dashboard Admin)
+  const { data: recentLogs = [], isLoading: isLoadingRecentLogs } = useQuery<AuditLogItem[]>({
+    queryKey: ['admin-recent-audit-logs', user?.id, user?.sekolah_id],
+    queryFn: async () => {
+      const res = await api.get('/audit-logs?limit=5');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!isAdmin && !isLoadingAuth,
   });
 
   if (isLoadingAuth) {
@@ -312,70 +324,125 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Akses Cepat Pengelolaan</CardTitle>
-              <CardDescription>Pintasan ke modul utama administrasi sekolah</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <Link href="/admin/jadwal">
-                <div className="p-4 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
-                  <div className="p-2 rounded-md bg-primary-light text-primary">
-                    <Calendar className="w-5 h-5" />
+          {/* Quick Actions & Recent Activity Logs Live dari DB */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Quick Actions (Col span 2) */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Akses Cepat Pengelolaan</CardTitle>
+                <CardDescription>Pintasan ke modul utama administrasi sekolah</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link href="/admin/jadwal">
+                  <div className="p-3.5 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
+                    <div className="p-2 rounded-md bg-primary-light text-primary">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Editor Jadwal & Bentrok</h4>
+                      <p className="text-xs text-foreground-muted mt-0.5">
+                        Kelola matriks jadwal pelajaran dan cek bentrok otomatis
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Editor Jadwal & Bentrok</h4>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      Kelola matriks jadwal pelajaran dan cek bentrok otomatis
-                    </p>
-                  </div>
-                </div>
-              </Link>
+                </Link>
 
-              <Link href="/admin/pengguna">
-                <div className="p-4 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
-                  <div className="p-2 rounded-md bg-success-light text-success">
-                    <Users className="w-5 h-5" />
+                <Link href="/admin/pengguna">
+                  <div className="p-3.5 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
+                    <div className="p-2 rounded-md bg-success-light text-success">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Manajemen Pengguna</h4>
+                      <p className="text-xs text-foreground-muted mt-0.5">
+                        Kelola data Siswa, Guru Mapel, dan Wali Kelas
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Manajemen Pengguna</h4>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      Kelola data Siswa, Guru Mapel, dan Penugasan Wali Kelas
-                    </p>
-                  </div>
-                </div>
-              </Link>
+                </Link>
 
-              <Link href="/admin/master-data">
-                <div className="p-4 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
-                  <div className="p-2 rounded-md bg-warning-light text-warning">
-                    <Layers className="w-5 h-5" />
+                <Link href="/admin/master-data">
+                  <div className="p-3.5 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
+                    <div className="p-2 rounded-md bg-warning-light text-warning">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Master Data Sekolah</h4>
+                      <p className="text-xs text-foreground-muted mt-0.5">
+                        Kelola Jurusan, Rombel/Kelas, dan Mata Pelajaran
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Master Data Sekolah</h4>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      Kelola Jurusan, Rombel/Kelas, dan Mata Pelajaran
-                    </p>
-                  </div>
-                </div>
-              </Link>
+                </Link>
 
-              <Link href="/admin/tahun-ajaran">
-                <div className="p-4 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
-                  <div className="p-2 rounded-md bg-secondary text-white">
-                    <Clock className="w-5 h-5" />
+                <Link href="/admin/audit-log">
+                  <div className="p-3.5 rounded-lg border border-border hover:border-primary hover:bg-background transition-all flex items-start gap-3 h-full">
+                    <div className="p-2 rounded-md bg-info-light text-primary">
+                      <History className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Log Aktivitas Sistem</h4>
+                      <p className="text-xs text-foreground-muted mt-0.5">
+                        Audit trail keamanan dan riwayat aksi sistem
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Tahun Ajaran & Semester</h4>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      Aktivasi tahun ajaran baru & duplikasi draft jadwal
-                    </p>
-                  </div>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Widget Log Aktivitas Terbaru (Live dari Database) */}
+            <Card>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm">Log Aktivitas Terkini</CardTitle>
+                  <CardDescription className="text-xs">Audit keamanan & aksi sistem</CardDescription>
                 </div>
-              </Link>
-            </CardContent>
-          </Card>
+                <Link href="/admin/audit-log">
+                  <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                    Semua
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent className="space-y-2.5 text-xs">
+                {isLoadingRecentLogs ? (
+                  Array.from({ length: 3 }).map((_, idx) => (
+                    <div key={idx} className="p-2 rounded border border-border bg-surface-muted animate-pulse space-y-1">
+                      <div className="h-3 w-20 bg-border rounded" />
+                      <div className="h-3 w-36 bg-border rounded" />
+                    </div>
+                  ))
+                ) : recentLogs.length > 0 ? (
+                  recentLogs.slice(0, 4).map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-2.5 rounded-lg border border-border bg-background/50 space-y-1 hover:border-primary/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-foreground truncate max-w-[130px]" title={log.actor_name}>
+                          {log.actor_name || log.actor_type}
+                        </span>
+                        <Badge variant="default" className="text-[10px] px-1.5 py-0 font-mono">
+                          {log.action}
+                        </Badge>
+                      </div>
+                      <p className="text-foreground-muted line-clamp-1 text-[11px]" title={log.details || ''}>
+                        {log.details || `Aksi pada modul ${log.resource}`}
+                      </p>
+                      <div className="text-[10px] text-foreground-muted/80">
+                        {formatTanggal(new Date(log.createdAt))} • {formatWaktu(new Date(log.createdAt))} WIB
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-foreground-muted">
+                    <History className="w-5 h-5 mx-auto mb-1 opacity-50" />
+                    <p className="text-xs">Belum ada aktivitas tercatat</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
