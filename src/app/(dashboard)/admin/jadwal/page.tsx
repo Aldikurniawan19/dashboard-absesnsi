@@ -539,7 +539,15 @@ export default function AdminJadwalPage() {
       toast.success('Pratinjau jadwal ujian berhasil dibuat', `${data.total_items} sesi ujian siap ditinjau`);
     },
     onError: (err: any) => {
-      toast.error('Gagal membuat pratinjau ujian', err?.response?.data?.message || err?.message || 'Periksa parameter tanggal');
+      const serverMsg =
+        (typeof err?.response?.data === 'string' ? err.response.data : null) ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : err?.response?.data?.message) ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Periksa parameter tanggal';
+      toast.error('Gagal membuat pratinjau ujian', serverMsg);
     },
   });
 
@@ -581,7 +589,10 @@ export default function AdminJadwalPage() {
     },
     onError: (err: any) => {
       const serverMsg =
-        err?.response?.data?.message ||
+        (typeof err?.response?.data === 'string' ? err.response.data : null) ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : err?.response?.data?.message) ||
         err?.response?.data?.error ||
         err?.message ||
         'Terjadi kesalahan sistem';
