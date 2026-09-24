@@ -88,10 +88,10 @@ export default function LoginPage() {
           </div>
           <div>
             <p className="text-sm font-bold tracking-tight text-white leading-tight">
-              Sistem Absensi Siswa
+              Sistem Informasi Akademik
             </p>
             <p className="text-xs text-slate-300">
-              Portal Akademik & Presensi
+              Portal Akademik SMA / SMK
             </p>
           </div>
         </header>
@@ -301,7 +301,7 @@ export default function LoginPage() {
         {/* Footer Sisi Kanan */}
         <footer className="pt-6 border-t border-border/60 text-center text-xs text-foreground-muted">
           <p>
-            Sistem Absensi Siswa Terpadu &copy; 2026. Hak Cipta Dilindungi.
+            Sistem Informasi Akademik &copy; 2026. Hak Cipta Dilindungi.
           </p>
         </footer>
       </section>
