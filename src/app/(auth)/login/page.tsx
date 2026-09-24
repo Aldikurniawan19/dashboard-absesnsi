@@ -14,7 +14,6 @@ import {
   School,
   Shield,
   ShieldCheck,
-  Sparkles,
   User,
   UserCheck,
 } from 'lucide-react';
@@ -65,7 +64,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen w-full flex flex-col lg:flex-row bg-background">
-      {/* Sisi Kiri: Hero Banner Visual dengan Background Gambar */}
+      {/* Sisi Kiri: Hero Banner Visual Clean */}
       <section className="relative hidden lg:flex lg:w-1/2 xl:w-7/12 flex-col justify-between p-10 xl:p-14 overflow-hidden bg-slate-950 text-white select-none">
         {/* Gambar Background */}
         <div className="absolute inset-0 z-0">
@@ -77,98 +76,67 @@ export default function LoginPage() {
             className="object-cover object-center brightness-90"
             sizes="(max-width: 1024px) 100vw, 60vw"
           />
-          {/* Lapisan Gradient Overlay untuk Legibilitas Maksimal */}
+          {/* Lapisan Gradient Overlay Lembut */}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-900/60" />
           <div className="absolute inset-0 bg-primary/20 mix-blend-multiply" />
         </div>
 
-        {/* Konten Atas: Header & Brand Identitas */}
-        <header className="relative z-10">
-          <div className="inline-flex items-center gap-3.5 px-4 py-2.5 rounded-xl ">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-white shadow-subtle">
-              <QrCode className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold tracking-wider uppercase text-blue-200">
-                Sistem Absensi Siswa
-              </p>
-              <p className="text-xs text-slate-200 font-medium">
-                Portal Presensi Terpadu SMA / SMK
-              </p>
-            </div>
+        {/* Konten Atas: Brand Identitas */}
+        <header className="relative z-10 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-subtle">
+            <QrCode className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold tracking-tight text-white leading-tight">
+              Sistem Absensi Siswa
+            </p>
+            <p className="text-xs text-slate-300">
+              Portal Akademik & Presensi
+            </p>
           </div>
         </header>
 
-        {/* Konten Tengah: Headline & Fitur Unggulan */}
-        <div className="relative z-10 my-auto py-10 max-w-xl space-y-6">
+        {/* Konten Tengah: Headline Ringkas & Tagline */}
+        <div className="relative z-10 my-auto py-8 max-w-lg space-y-6">
           <div className="space-y-3">
             <h1 className="text-3xl xl:text-4xl font-bold tracking-tight text-white leading-tight">
-              Presensi Digital Cerdas, Cepat, dan Terintegrasi
+              Presensi Digital Cerdas & Terintegrasi
             </h1>
-            <p className="text-sm xl:text-base text-slate-200/90 leading-relaxed">
-              Satu portal terpadu untuk Guru, Wali Kelas, dan Administrator Sekolah dalam mengelola presensi berbasis QR dinamis, pemantauan kehadiran siswa real-time, dan rekapitulasi laporan.
+            <p className="text-sm xl:text-base text-slate-200/80 leading-relaxed">
+              Portal terpadu untuk Guru, Wali Kelas, dan Administrator Sekolah.
             </p>
           </div>
 
-          {/* Daftar Keunggulan Sistem */}
-          <div className="grid gap-3 pt-2">
-            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 transition-colors">
-              <div className="h-8 w-8 rounded-lg bg-primary/30 border border-primary/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
-                <QrCode className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-semibold text-white">
-                  Presensi QR Dinamis & Anti-Kecurangan
-                </h2>
-                <p className="text-xs text-slate-300">
-                  Kode QR berganti secara otomatis per sesi mata pelajaran dengan validasi koordinat lokasi sekolah.
-                </p>
-              </div>
+          {/* Fitur Utama dalam Bentuk Pill Ringkas */}
+          <div className="flex flex-wrap gap-2.5 pt-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 text-xs font-medium text-slate-200">
+              <QrCode className="w-4 h-4 text-blue-300" />
+              <span>QR Code Dinamis</span>
             </div>
-
-            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 transition-colors">
-              <div className="h-8 w-8 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0 mt-0.5">
-                <UserCheck className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-semibold text-white">
-                  Dashboard Khusus Guru & Wali Kelas
-                </h2>
-                <p className="text-xs text-slate-300">
-                  Kemudahan verifikasi izin, sakit, rekapitulasi kehadiran per kelas, dan unduh laporan berkala.
-                </p>
-              </div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 text-xs font-medium text-slate-200">
+              <UserCheck className="w-4 h-4 text-emerald-300" />
+              <span>Rekapitulasi Presensi</span>
             </div>
-
-            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 transition-colors">
-              <div className="h-8 w-8 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 shrink-0 mt-0.5">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-semibold text-white">
-                  Pusat Kendali & Audit Log Administrator
-                </h2>
-                <p className="text-xs text-slate-300">
-                  Kontrol master data siswa, guru, kelas, jadwal pelajaran, serta rekam jejak aktivitas sistem.
-                </p>
-              </div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 text-xs font-medium text-slate-200">
+              <ShieldCheck className="w-4 h-4 text-amber-300" />
+              <span>Monitoring Real-time</span>
             </div>
           </div>
         </div>
 
-        {/* Konten Bawah: Footer & Info Keamanan */}
-        <footer className="relative z-10 flex items-center justify-between pt-6 border-t border-white/10 text-xs text-slate-300">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <span>Koneksi aman dengan enkripsi data terproteksi</span>
-          </div>
-          <span className="text-slate-400">Versi 1.0.0</span>
+        {/* Konten Bawah: Footer Info */}
+        <footer className="relative z-10 flex items-center justify-between text-xs text-slate-400">
+          <span className="flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Portal Terproteksi</span>
+          </span>
+          <span>Versi 1.0.0</span>
         </footer>
       </section>
 
       {/* Sisi Kanan: Form Login Tunggal */}
       <section className="w-full lg:w-1/2 xl:w-5/12 flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-14 bg-surface min-h-screen lg:min-h-full overflow-y-auto">
-        {/* Mobile Header (Hanya muncul di layar mobile & tablet) */}
+        {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between pb-6 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-subtle">
@@ -219,7 +187,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Input Identifier Tunggal */}
+            {/* Input Identifier */}
             <Input
               id="identifier-input"
               label="Identifier (NIP atau Email)"
