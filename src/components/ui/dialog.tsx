@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { Loader2, X } from 'lucide-react';
 
@@ -29,7 +30,12 @@ export function Dialog({
   loadingMessage = 'Memproses data...',
   preventClose = false,
 }: DialogProps) {
+  const [mounted, setMounted] = useState(false);
   const isLocked = isLoading || preventClose;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,11 +43,17 @@ export function Dialog({
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [isOpen, onClose, isLocked]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const maxWidths = {
     sm: 'max-w-sm',
@@ -52,12 +64,12 @@ export function Dialog({
     full: 'max-w-4xl',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+  const dialogContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* Backdrop dengan Blur Penuh Menutupi Navbar & Seluruh Layar */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity',
+          'fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-all duration-200 animate-in fade-in',
           isLocked ? 'cursor-not-allowed' : 'cursor-pointer',
         )}
         onClick={() => {
@@ -65,15 +77,18 @@ export function Dialog({
             onClose();
           }
         }}
+        aria-hidden="true"
       />
 
-      {/* Modal Box */}
+      {/* Modal Box Card */}
       <div
         className={cn(
-          'relative w-full rounded-xl border border-border bg-surface p-6 shadow-elevated transition-all z-10 overflow-hidden',
+          'relative w-full rounded-2xl border border-border bg-surface p-6 shadow-elevated transition-all z-10 overflow-hidden animate-in zoom-in-95 duration-150',
           maxWidths[maxWidth],
           className,
         )}
+        role="dialog"
+        aria-modal="true"
       >
         {/* Animated Progress Bar on Top when Loading */}
         {isLoading && (
@@ -92,14 +107,14 @@ export function Dialog({
           }}
           disabled={isLocked}
           aria-label="Tutup modal"
-          className="absolute right-4 top-4 rounded-md p-1 text-foreground-muted hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-foreground-muted hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
           <span className="sr-only">Tutup</span>
         </button>
 
         {title && (
-          <div className="mb-4">
+          <div className="mb-4 pr-6">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-foreground">{title}</h3>
               {isLoading && (
@@ -110,16 +125,18 @@ export function Dialog({
               )}
             </div>
             {description && (
-              <p className="text-xs text-foreground-muted mt-1">{description}</p>
+              <p className="text-xs text-foreground-muted mt-1 leading-relaxed">{description}</p>
             )}
           </div>
         )}
 
-        {/* Modal Body with disabled fieldset during active processing */}
+        {/* Modal Body */}
         <fieldset disabled={isLoading} className="space-y-0 disabled:opacity-80">
           {children}
         </fieldset>
       </div>
     </div>
   );
+
+  return createPortal(dialogContent, document.body);
 }

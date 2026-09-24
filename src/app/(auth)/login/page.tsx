@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import {
   AlertCircle,
   ArrowRight,
-  CheckCircle2,
   Lock,
   QrCode,
   School,
@@ -24,7 +23,6 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [activeRoleTab, setActiveRoleTab] = useState<'guru' | 'admin'>('guru');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,7 +53,6 @@ export default function LoginPage() {
   };
 
   const fillCredentials = (type: 'admin' | 'guru') => {
-    setActiveRoleTab(type);
     if (type === 'admin') {
       setIdentifier('admin@sekolah.sch.id');
       setPassword('password123');
@@ -63,11 +60,6 @@ export default function LoginPage() {
       setIdentifier('ahmad.fauzi@guru.sch.id');
       setPassword('password123');
     }
-    setError(null);
-  };
-
-  const selectRoleTab = (type: 'admin' | 'guru') => {
-    setActiveRoleTab(type);
     setError(null);
   };
 
@@ -92,7 +84,7 @@ export default function LoginPage() {
 
         {/* Konten Atas: Header & Brand Identitas */}
         <header className="relative z-10">
-          <div className="inline-flex items-center gap-3.5 px-4 py-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 shadow-elevated">
+          <div className="inline-flex items-center gap-3.5 px-4 py-2.5 rounded-xl ">
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-white shadow-subtle">
               <QrCode className="h-5 w-5" />
             </div>
@@ -110,10 +102,6 @@ export default function LoginPage() {
         {/* Konten Tengah: Headline & Fitur Unggulan */}
         <div className="relative z-10 my-auto py-10 max-w-xl space-y-6">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-blue-300" />
-              <span>Platform Manajemen Akademik & Presensi</span>
-            </div>
             <h1 className="text-3xl xl:text-4xl font-bold tracking-tight text-white leading-tight">
               Presensi Digital Cerdas, Cepat, dan Terintegrasi
             </h1>
@@ -178,7 +166,7 @@ export default function LoginPage() {
         </footer>
       </section>
 
-      {/* Sisi Kanan: Form Login */}
+      {/* Sisi Kanan: Form Login Tunggal */}
       <section className="w-full lg:w-1/2 xl:w-5/12 flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-14 bg-surface min-h-screen lg:min-h-full overflow-y-auto">
         {/* Mobile Header (Hanya muncul di layar mobile & tablet) */}
         <div className="lg:hidden flex items-center justify-between pb-6 border-b border-border">
@@ -209,39 +197,11 @@ export default function LoginPage() {
               Masuk ke Akun
             </h2>
             <p className="text-sm text-foreground-muted leading-relaxed">
-              Gunakan NIP/Email untuk Guru, atau Email Akun untuk Administrator Sekolah.
+              Masukkan NIP atau Email serta kata sandi Anda untuk mengakses dashboard.
             </p>
           </div>
 
-          {/* Pilihan Peran / Role Tab Switcher */}
-          <div className="p-1 rounded-lg bg-background border border-border grid grid-cols-2 gap-1">
-            <button
-              type="button"
-              onClick={() => selectRoleTab('guru')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-semibold transition-all ${
-                activeRoleTab === 'guru'
-                  ? 'bg-surface text-primary shadow-subtle border border-border/80'
-                  : 'text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Portal Guru</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectRoleTab('admin')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-semibold transition-all ${
-                activeRoleTab === 'admin'
-                  ? 'bg-surface text-primary shadow-subtle border border-border/80'
-                  : 'text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Administrator</span>
-            </button>
-          </div>
-
-          {/* Form Login */}
+          {/* Form Login Tunggal */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Pesan Error */}
             {error && (
@@ -259,19 +219,11 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Input Identifier */}
+            {/* Input Identifier Tunggal */}
             <Input
               id="identifier-input"
-              label={
-                activeRoleTab === 'guru'
-                  ? 'NIP atau Email Guru'
-                  : 'Email Administrator'
-              }
-              placeholder={
-                activeRoleTab === 'guru'
-                  ? 'misal: ahmad.fauzi@guru.sch.id atau 1985...'
-                  : 'misal: admin@sekolah.sch.id'
-              }
+              label="Identifier (NIP atau Email)"
+              placeholder="misal: ahmad.fauzi@guru.sch.id atau NIP"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               disabled={isLoading}
@@ -310,7 +262,7 @@ export default function LoginPage() {
 
               <span
                 className="text-xs text-foreground-muted hover:text-primary transition-colors cursor-pointer"
-                title="Hubungi admin sekolah jika Anda lupa kata sandi"
+                title="Hubungi administrator sekolah jika Anda lupa kata sandi"
               >
                 Lupa kata sandi?
               </span>
@@ -324,11 +276,7 @@ export default function LoginPage() {
               className="w-full mt-2 justify-center font-semibold text-sm shadow-card"
               isLoading={isLoading}
             >
-              <span>
-                {activeRoleTab === 'guru'
-                  ? 'Masuk sebagai Guru'
-                  : 'Masuk sebagai Administrator'}
-              </span>
+              <span>Masuk ke Sistem</span>
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </form>
