@@ -58,12 +58,12 @@ const config: Config = {
       },
       keyframes: {
         shimmer: {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100%)' },
+          '0%': { transform: 'translateX(-150%) skewX(-20deg)' },
+          '100%': { transform: 'translateX(150%) skewX(-20deg)' },
         },
       },
       animation: {
-        shimmer: 'shimmer 1.8s infinite ease-in-out',
+        shimmer: 'shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
       },
     },
   },

@@ -202,3 +202,223 @@ export interface AuditLogResponse {
   };
 }
 
+// =========================================================================
+// PENILAIAN KURIKULUM MERDEKA
+// =========================================================================
+
+export type KomponenNilai = 'FORMATIF' | 'STS' | 'SAS';
+export type StatusRaport = 'DRAFT' | 'FINAL' | 'BELUM_DIBUAT';
+export type PredikatBBPB = 'BB' | 'MB' | 'BSH' | 'SB';
+
+export interface KonfigurasiPenilaian {
+  id?: string;
+  sekolah_id?: string;
+  tahun_ajaran_id?: string;
+  bobot_formatif: number;
+  bobot_sts: number;
+  bobot_sas: number;
+  batas_bb: number;
+  batas_mb: number;
+  batas_bsh: number;
+}
+
+export interface NilaiSiswaItem {
+  id: string;
+  siswa_id: string;
+  mapel_id: string;
+  kelas_id: string;
+  tahun_ajaran_id: string;
+  guru_id: string;
+  komponen: KomponenNilai;
+  judul: string;
+  nilai: number;
+  catatan?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NilaiFormatifDetail {
+  id: string;
+  judul: string;
+  nilai: number;
+  catatan?: string | null;
+}
+
+export interface RekapNilaiSiswaMapel {
+  siswa_id: string;
+  nisn: string;
+  nama: string;
+  nilai_formatif: NilaiFormatifDetail[];
+  rata_formatif: number | null;
+  nilai_sts: number | null;
+  nilai_sas: number | null;
+  nilai_akhir: number | null;
+  predikat: PredikatBBPB | null;
+  predikat_label?: string | null;
+  catatan_capaian?: string | null;
+}
+
+export interface RekapKelasMapelResponse {
+  kelas: {
+    id: string;
+    tingkat: number;
+    nama_rombel: string;
+    nama_lengkap: string;
+  };
+  mapel: {
+    id: string;
+    nama: string;
+    kode: string;
+  };
+  tahun_ajaran: {
+    id: string;
+    nama: string;
+    semester: string;
+  };
+  konfigurasi: KonfigurasiPenilaian;
+  kolom_formatif: string[];
+  siswa_list: RekapNilaiSiswaMapel[];
+}
+
+export interface RekapSemuaMapelKelasResponse {
+  kelas: {
+    id: string;
+    tingkat: number;
+    nama_rombel: string;
+    nama_lengkap: string;
+  };
+  tahun_ajaran: {
+    id: string;
+    nama: string;
+    semester: string;
+  };
+  mapel_list: Array<{
+    id: string;
+    nama: string;
+    kode: string;
+  }>;
+  siswa_list: Array<{
+    siswa_id: string;
+    nisn: string;
+    nama: string;
+    mapel_nilai: Record<
+      string,
+      {
+        rata_formatif: number | null;
+        nilai_sts: number | null;
+        nilai_sas: number | null;
+        nilai_akhir: number | null;
+        predikat: PredikatBBPB | null;
+      }
+    >;
+  }>;
+}
+
+export interface KelasMapelGuruItem {
+  kelas_id: string;
+  kelas_nama: string;
+  tingkat: number;
+  jumlah_siswa: number;
+  mapel_id: string;
+  mapel_nama: string;
+  mapel_kode: string;
+}
+
+export interface EkstrakurikulerMaster {
+  id: string;
+  nama: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    keanggotaan: number;
+  };
+}
+
+export interface EkskulSiswaRecord {
+  id: string;
+  ekstrakurikuler_id: string;
+  nama_ekskul: string;
+  predikat?: string | null;
+  keterangan?: string | null;
+}
+
+export interface EkskulSiswaKelasItem {
+  siswa_id: string;
+  nisn: string;
+  nama: string;
+  ekskul_list: EkskulSiswaRecord[];
+}
+
+export interface RaportKelasListItem {
+  siswa_id: string;
+  nama: string;
+  nisn: string;
+  raport_id: string | null;
+  status: StatusRaport;
+  tanggal_terbit: string | null;
+  jumlah_mapel_dinilai: number;
+  total_mapel: number;
+  catatan_terisi: boolean;
+}
+
+export interface NilaiRaportMapel {
+  mapel_id: string;
+  mapel_nama: string;
+  mapel_kode: string;
+  nilai_akhir: number | null;
+  predikat: PredikatBBPB | null;
+  predikat_label?: string | null;
+  capaian_kompetensi: string;
+}
+
+export interface RekapKehadiranRaport {
+  hadir: number;
+  terlambat: number;
+  sakit: number;
+  izin: number;
+  alpa: number;
+}
+
+export interface EkskulRaportItem {
+  nama: string;
+  predikat: string;
+  keterangan: string;
+}
+
+export interface DetailRaportSiswaResponse {
+  raport_id: string | null;
+  status: StatusRaport;
+  tanggal_terbit: string | null;
+  siswa: {
+    id: string;
+    nama: string;
+    nisn: string;
+  };
+  kelas: {
+    id: string;
+    nama_lengkap: string;
+    tingkat: number;
+  };
+  sekolah: {
+    id: string;
+    nama: string;
+    npsn: string;
+    alamat?: string | null;
+  };
+  tahun_ajaran: {
+    id: string;
+    nama: string;
+    semester: string;
+  };
+  wali_kelas: {
+    id: string;
+    nama: string;
+    nip?: string | null;
+  } | null;
+  nilai_mapel: NilaiRaportMapel[];
+  ekstrakurikuler: EkskulRaportItem[];
+  kehadiran: RekapKehadiranRaport;
+  catatan_wali_kelas: string | null;
+}
+
+

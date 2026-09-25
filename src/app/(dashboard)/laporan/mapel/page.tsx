@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/loading-state';
 import { MataPelajaran, TahunAjaran } from '@/types/api';
 import {
   BarChart,
@@ -166,7 +167,29 @@ export default function LaporanMapelPage() {
 
       {/* Overview Cards */}
       {selectedMapelId && (
-        <div className="space-y-6">
+        isLoadingReport ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="p-5 space-y-2 border-border shadow-subtle">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-8 w-16" />
+                </Card>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="p-6 space-y-4 border-border shadow-subtle">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </Card>
+              <Card className="p-6 space-y-4 border-border shadow-subtle">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </Card>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className="border-primary/30 bg-primary-light/20">
               <CardContent className="p-5 flex items-center justify-between">
@@ -280,6 +303,7 @@ export default function LaporanMapelPage() {
             </Card>
           </div>
         </div>
+        )
       )}
     </div>
   );

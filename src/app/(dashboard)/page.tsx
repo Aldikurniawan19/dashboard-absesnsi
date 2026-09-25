@@ -10,13 +10,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { PageSkeleton } from '@/components/ui/loading-state';
-import { getHariName, formatTanggal, formatWaktu } from '@/lib/utils';
+import { getHariName, formatNamaKelas, formatTanggal, formatWaktu } from '@/lib/utils';
 import {
+  ArrowRight,
+  Award,
   BookOpen,
   Calendar,
   CheckCircle2,
   Clock,
   FileCheck2,
+  FileSpreadsheet,
+  FileText,
   GraduationCap,
   History,
   Layers,
@@ -449,19 +453,24 @@ export default function DashboardPage() {
       {/* ========================================================================= */}
       {/* GURU DASHBOARD VIEW                                                       */}
       {/* ========================================================================= */}
-      {isGuru && (
-        <div className="space-y-6">
-          {/* Header Info Guru */}
-          <div className="p-4 rounded-lg border border-border bg-surface flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-foreground">{user?.nama}</h3>
-                {isWaliKelas && <Badge variant="info">Wali Kelas</Badge>}
+      {isGuru && (() => {
+        const waliKelasClasses = user?.penugasan_wali_kelas?.map((p) => formatNamaKelas(p.kelas)).filter(Boolean) || [];
+        const waliKelasText = waliKelasClasses.length > 0 ? `Wali Kelas ${waliKelasClasses.join(', ')}` : 'Wali Kelas';
+        const utamaKelasNama = waliKelasClasses[0] || 'Kelas';
+
+        return (
+          <div className="space-y-6">
+            {/* Header Info Guru */}
+            <div className="p-4 rounded-lg border border-border bg-surface flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-foreground">{user?.nama}</h3>
+                  {isWaliKelas && <Badge variant="info">{waliKelasText}</Badge>}
+                </div>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  NIP: {user?.nip || '-'} | Email: {user?.email || '-'}
+                </p>
               </div>
-              <p className="text-xs text-foreground-muted mt-0.5">
-                NIP: {user?.nip || '-'} | Email: {user?.email || '-'}
-              </p>
-            </div>
             <div className="flex items-center gap-2">
               <Link href="/guru/jadwal">
                 <Button size="sm" variant="primary">
@@ -612,53 +621,162 @@ export default function DashboardPage() {
 
           {/* Wali Kelas Section jika merangkap */}
           {isWaliKelas && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Tugas Wali Kelas: Verifikasi Izin Siswa</CardTitle>
-                    <CardDescription>
-                      Daftar permohonan izin/sakit dari siswa di kelas binaan Anda
-                    </CardDescription>
-                  </div>
-                  <Badge variant="warning">{pendingIzin?.length || 0} Menunggu</Badge>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    Menu & Tanggung Jawab {waliKelasText}
+                  </h3>
+                  <p className="text-xs text-foreground-muted">
+                    Akses cepat pengelolaan raport Kurikulum Merdeka, rekap nilai, absensi harian, dan persetujuan izin
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {pendingIzin && pendingIzin.length > 0 ? (
-                  <div className="space-y-3">
-                    {pendingIzin.map((item: any) => (
-                      <div
-                        key={item.id}
-                        className="p-4 rounded-lg border border-border bg-background/50 flex items-center justify-between text-sm"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground">{item.siswa?.nama}</span>
-                            <span className="text-xs text-foreground-muted">({item.siswa?.nisn})</span>
-                            <StatusBadge status={item.jenis} />
-                          </div>
-                          <p className="text-xs text-foreground-muted mt-1">{item.keterangan}</p>
+                <Badge variant="info" className="text-xs px-2.5 py-1">
+                  {waliKelasClasses.length > 0 ? waliKelasClasses.join(', ') : 'Wali Kelas'}
+                </Badge>
+              </div>
+
+              {/* Action Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Link href="/wali-kelas/raport">
+                  <Card className="h-full border-border hover:border-primary/50 hover:shadow-subtle transition-all cursor-pointer group">
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="h-9 w-9 rounded-lg bg-primary-light flex items-center justify-center text-primary mb-3">
+                          <FileText className="h-4.5 w-4.5" />
                         </div>
-                        <Link href="/wali-kelas/persetujuan-izin">
-                          <Button size="sm" variant="outline">
-                            Tinjau Permohonan
-                          </Button>
-                        </Link>
+                        <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                          Raport Siswa {utamaKelasNama}
+                        </h4>
+                        <p className="text-xs text-foreground-muted mt-1">
+                          Catatan wali kelas, status kelengkapan nilai, dan cetak PDF raport
+                        </p>
                       </div>
-                    ))}
+                      <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-xs font-medium text-primary">
+                        <span>Buka Menu Raport</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                <Link href="/wali-kelas/nilai">
+                  <Card className="h-full border-border hover:border-primary/50 hover:shadow-subtle transition-all cursor-pointer group">
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="h-9 w-9 rounded-lg bg-success-light flex items-center justify-center text-success mb-3">
+                          <FileSpreadsheet className="h-4.5 w-4.5" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                          Rekap Nilai {utamaKelasNama}
+                        </h4>
+                        <p className="text-xs text-foreground-muted mt-1">
+                          Matriks rekapitulasi capaian nilai seluruh mata pelajaran siswa
+                        </p>
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-xs font-medium text-primary">
+                        <span>Lihat Rekap Nilai</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                <Link href="/wali-kelas/ekstrakurikuler">
+                  <Card className="h-full border-border hover:border-primary/50 hover:shadow-subtle transition-all cursor-pointer group">
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="h-9 w-9 rounded-lg bg-warning-light flex items-center justify-center text-warning mb-3">
+                          <Award className="h-4.5 w-4.5" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                          Ekstrakurikuler {utamaKelasNama}
+                        </h4>
+                        <p className="text-xs text-foreground-muted mt-1">
+                          Kelola penilaian predikat dan catatan kegiatan ekskul siswa
+                        </p>
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-xs font-medium text-primary">
+                        <span>Kelola Ekskul</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                <Link href="/wali-kelas/rekap-kelas">
+                  <Card className="h-full border-border hover:border-primary/50 hover:shadow-subtle transition-all cursor-pointer group">
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="h-9 w-9 rounded-lg bg-primary-light flex items-center justify-center text-primary mb-3">
+                          <GraduationCap className="h-4.5 w-4.5" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                          Presensi {utamaKelasNama}
+                        </h4>
+                        <p className="text-xs text-foreground-muted mt-1">
+                          Pantau riwayat absensi harian siswa per mata pelajaran
+                        </p>
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-xs font-medium text-primary">
+                        <span>Lihat Presensi</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
+
+              {/* Verifikasi Izin Siswa */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Tugas Wali Kelas: Verifikasi Izin Siswa {waliKelasClasses.length > 0 ? `(${waliKelasClasses.join(', ')})` : ''}</CardTitle>
+                      <CardDescription>
+                        Daftar permohonan izin/sakit dari siswa di kelas binaan Anda
+                      </CardDescription>
+                    </div>
+                    <Badge variant="warning">{pendingIzin?.length || 0} Menunggu</Badge>
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-foreground-muted text-xs">
-                    <CheckCircle2 className="w-8 h-8 text-success mx-auto mb-2 opacity-80" />
-                    <p>Semua pengajuan izin siswa telah ditinjau</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {pendingIzin && pendingIzin.length > 0 ? (
+                    <div className="space-y-3">
+                      {pendingIzin.map((item: any) => (
+                        <div
+                          key={item.id}
+                          className="p-4 rounded-lg border border-border bg-background/50 flex items-center justify-between text-sm"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-foreground">{item.siswa?.nama}</span>
+                              <span className="text-xs text-foreground-muted">({item.siswa?.nisn})</span>
+                              <StatusBadge status={item.jenis} />
+                            </div>
+                            <p className="text-xs text-foreground-muted mt-1">{item.keterangan}</p>
+                          </div>
+                          <Link href="/wali-kelas/persetujuan-izin">
+                            <Button size="sm" variant="outline">
+                              Tinjau Permohonan
+                            </Button>
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-foreground-muted text-xs">
+                      <CheckCircle2 className="w-8 h-8 text-success mx-auto mb-2 opacity-80" />
+                      <p>Semua pengajuan izin siswa telah ditinjau</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

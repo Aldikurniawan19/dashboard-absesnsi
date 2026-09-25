@@ -46,12 +46,22 @@ export function LoadingScreen({
 
 interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
+  variant?: 'default' | 'circle' | 'text' | 'card';
+  animate?: boolean;
 }
 
-export function Skeleton({ className, ...props }: SkeletonProps) {
+export function Skeleton({ className, variant = 'default', animate = true, ...props }: SkeletonProps) {
   return (
     <div
-      className={cn('skeleton-shimmer rounded-md', className)}
+      className={cn(
+        'rounded-md',
+        animate && 'skeleton-shimmer',
+        !animate && 'bg-border/60',
+        variant === 'circle' && 'rounded-full',
+        variant === 'text' && 'h-4 rounded-sm',
+        variant === 'card' && 'rounded-xl p-4 border border-border/60 bg-surface',
+        className,
+      )}
       {...props}
     />
   );
@@ -61,34 +71,120 @@ interface TableSkeletonProps {
   rows?: number;
   cols?: number;
   columns?: number;
+  showHeader?: boolean;
+  showPagination?: boolean;
   className?: string;
 }
 
-export function TableSkeleton({ rows = 5, cols, columns, className }: TableSkeletonProps) {
+export function TableSkeleton({
+  rows = 5,
+  cols,
+  columns,
+  showHeader = true,
+  showPagination = true,
+  className,
+}: TableSkeletonProps) {
   const columnCount = columns ?? cols ?? 4;
 
   return (
-    <div className={cn('w-full space-y-3 rounded-lg border border-border p-4 bg-surface', className)}>
-      {/* Header Skeleton */}
-      <div className="flex items-center justify-between pb-3 border-b border-border/60">
-        <Skeleton className="h-4.5 w-1/4" />
-        <Skeleton className="h-4 w-16" />
-      </div>
+    <div className={cn('w-full rounded-xl border border-border shadow-subtle overflow-hidden bg-surface', className)}>
+      {/* Table Top Controls Placeholder (optional filter/search) */}
+      {showHeader && (
+        <div className="flex items-center justify-between p-4 border-b border-border/60 bg-surface-elevated/40">
+          <Skeleton className="h-4.5 w-44" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-24 rounded-lg" />
+            <Skeleton className="h-8 w-8 rounded-lg" />
+          </div>
+        </div>
+      )}
 
-      {/* Row Skeletons */}
-      <div className="space-y-3 pt-1">
-        {Array.from({ length: rows }).map((_, rIdx) => (
-          <div key={`row-${rIdx}`} className="flex items-center gap-4 py-2 border-b border-border/30 last:border-0">
+      {/* Table Content */}
+      <div className="overflow-x-auto">
+        <div className="min-w-full divide-y divide-border/60">
+          {/* Header Row */}
+          <div className="flex items-center gap-4 px-6 py-3.5 bg-surface-elevated/60 border-b border-border">
             {Array.from({ length: columnCount }).map((_, cIdx) => (
               <Skeleton
-                key={`col-${rIdx}-${cIdx}`}
+                key={`th-${cIdx}`}
                 className={cn(
-                  'h-4',
-                  cIdx === 0 ? 'w-1/3' : cIdx === 1 ? 'w-1/4' : 'flex-1',
+                  'h-3.5',
+                  cIdx === 0
+                    ? 'w-12 shrink-0'
+                    : cIdx === 1
+                    ? 'w-1/4'
+                    : cIdx === columnCount - 1
+                    ? 'w-20 ml-auto'
+                    : 'flex-1',
                 )}
               />
             ))}
           </div>
+
+          {/* Body Rows */}
+          <div className="divide-y divide-border/40">
+            {Array.from({ length: rows }).map((_, rIdx) => (
+              <div
+                key={`row-${rIdx}`}
+                className="flex items-center gap-4 px-6 py-4 hover:bg-background/30 transition-colors"
+              >
+                {Array.from({ length: columnCount }).map((_, cIdx) => (
+                  <Skeleton
+                    key={`col-${rIdx}-${cIdx}`}
+                    className={cn(
+                      'h-4',
+                      cIdx === 0
+                        ? 'w-8 shrink-0'
+                        : cIdx === 1
+                        ? 'w-1/3'
+                        : cIdx === columnCount - 1
+                        ? 'w-16 ml-auto'
+                        : 'flex-1',
+                    )}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Pagination Footer */}
+      {showPagination && (
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-border/60 bg-surface-elevated/30">
+          <Skeleton className="h-3.5 w-32" />
+          <div className="flex items-center gap-1.5">
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CardSkeletonProps {
+  className?: string;
+  rows?: number;
+}
+
+export function CardSkeleton({ className, rows = 3 }: CardSkeletonProps) {
+  return (
+    <div className={cn('p-5 rounded-xl border border-border shadow-subtle bg-surface space-y-4', className)}>
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-1/3" />
+        <Skeleton className="h-5 w-16" />
+      </div>
+      <div className="space-y-2.5 pt-1">
+        {Array.from({ length: rows }).map((_, idx) => (
+          <Skeleton
+            key={idx}
+            className={cn(
+              'h-4',
+              idx === 0 ? 'w-full' : idx === 1 ? 'w-5/6' : 'w-2/3',
+            )}
+          />
         ))}
       </div>
     </div>
@@ -115,7 +211,7 @@ export function PageSkeleton({ className }: PageSkeletonProps) {
       </div>
 
       {/* Main Table Skeleton */}
-      <TableSkeleton rows={6} cols={4} />
+      <TableSkeleton rows={6} columns={4} />
     </div>
   );
 }

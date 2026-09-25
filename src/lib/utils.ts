@@ -180,3 +180,22 @@ export function generateMapelKode(nama: string): string {
 
   return words.map((w) => w[0].toUpperCase()).join('');
 }
+
+/**
+ * Format nama kelas lengkap (contoh: "10 MIPA 3" atau "12 TKJ 1").
+ * Menggabungkan tingkat, kode/nama jurusan, dan nama rombel.
+ */
+export function formatNamaKelas(kelas?: {
+  tingkat?: number;
+  nama_rombel?: string;
+  nama_lengkap?: string;
+  jurusan?: { kode?: string; nama?: string } | null;
+} | null): string {
+  if (!kelas) return '';
+  if (kelas.nama_lengkap) return kelas.nama_lengkap;
+  const jurusanStr = kelas.jurusan?.kode || kelas.jurusan?.nama || '';
+  return [kelas.tingkat, jurusanStr, kelas.nama_rombel]
+    .filter((part) => part !== undefined && part !== null && part !== '')
+    .join(' ');
+}
+

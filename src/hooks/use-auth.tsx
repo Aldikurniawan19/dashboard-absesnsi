@@ -51,6 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        setUser(JSON.parse(stored));
+      }
+    } catch {
+      // Ignore JSON parse error
+    }
     fetchProfile();
   }, []);
 

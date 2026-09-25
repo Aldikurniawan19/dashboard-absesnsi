@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge, StatusBadge } from '@/components/ui/badge';
-import { formatTanggal, formatWaktu } from '@/lib/utils';
-import { Calendar, CheckCircle, GraduationCap, Users } from 'lucide-react';
+import { formatNamaKelas, formatTanggal, formatWaktu } from '@/lib/utils';
+import { Calendar } from 'lucide-react';
 import { Kelas } from '@/types/api';
 
 export default function RekapKelasPage() {
@@ -79,7 +79,7 @@ export default function RekapKelasPage() {
               options={
                 kelasList.length > 0
                   ? (kelasList || []).map((k) => ({
-                      label: k.nama_lengkap || `Kelas ${k.tingkat} ${k.nama_rombel}`,
+                      label: k.nama_lengkap || `Kelas ${formatNamaKelas(k)}`,
                       value: k.id,
                     }))
                   : [{ label: '-- Tidak ada kelas yang diampu --', value: '' }]

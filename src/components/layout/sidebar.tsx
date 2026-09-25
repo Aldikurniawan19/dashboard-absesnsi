@@ -6,17 +6,20 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import {
+  Award,
   BookOpen,
   Calendar,
   ChevronDown,
   Clock,
   FileCheck2,
   FileSpreadsheet,
+  FileText,
   GraduationCap,
   History,
   LayoutDashboard,
   QrCode,
   Settings,
+  Sliders,
   UserCheck,
   Users,
 } from 'lucide-react';
@@ -46,12 +49,16 @@ export function Sidebar() {
   const { user, isGuru, isAdmin, isWaliKelas } = useAuth();
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
     '/admin/jadwal': true,
+    '/admin/penilaian': true,
   });
 
   // Otomatis buka submenu jika route saat ini berada di dalamnya
   useEffect(() => {
     if (pathname.startsWith('/admin/jadwal')) {
       setOpenSubmenus((prev) => ({ ...prev, '/admin/jadwal': true }));
+    }
+    if (pathname.startsWith('/admin/penilaian')) {
+      setOpenSubmenus((prev) => ({ ...prev, '/admin/penilaian': true }));
     }
   }, [pathname]);
 
@@ -89,6 +96,23 @@ export function Sidebar() {
               href: '/admin/jadwal/ujian',
               label: 'Jadwal Ujian',
               icon: <GraduationCap className="w-3.5 h-3.5" />,
+            },
+          ],
+        },
+        {
+          href: '/admin/penilaian',
+          label: 'Kurikulum Merdeka',
+          icon: <Award className="w-4 h-4" />,
+          children: [
+            {
+              href: '/admin/penilaian/konfigurasi',
+              label: 'Bobot & Predikat',
+              icon: <Sliders className="w-3.5 h-3.5" />,
+            },
+            {
+              href: '/admin/penilaian/ekstrakurikuler',
+              label: 'Master Ekskul',
+              icon: <Award className="w-3.5 h-3.5" />,
             },
           ],
         },
@@ -133,6 +157,12 @@ export function Sidebar() {
       ],
     },
     {
+      title: 'Penilaian Kurikulum Merdeka',
+      items: [
+        { href: '/guru/nilai', label: 'Input Nilai Siswa', icon: <Award className="w-4 h-4" /> },
+      ],
+    },
+    {
       title: 'Laporan',
       items: [
         { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
@@ -141,7 +171,6 @@ export function Sidebar() {
     },
   ];
 
-
   // Menu Tambahan Wali Kelas
   const waliKelasGroups: NavGroup[] = [
     {
@@ -149,6 +178,9 @@ export function Sidebar() {
       items: [
         { href: '/wali-kelas/persetujuan-izin', label: 'Persetujuan Izin / Sakit', icon: <FileCheck2 className="w-4 h-4" /> },
         { href: '/wali-kelas/rekap-kelas', label: 'Rekap Kehadiran Kelas', icon: <GraduationCap className="w-4 h-4" /> },
+        { href: '/wali-kelas/nilai', label: 'Rekap Nilai Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
+        { href: '/wali-kelas/raport', label: 'Raport Siswa', icon: <FileText className="w-4 h-4" /> },
+        { href: '/wali-kelas/ekstrakurikuler', label: 'Ekstrakurikuler Siswa', icon: <Award className="w-4 h-4" /> },
       ],
     },
   ];

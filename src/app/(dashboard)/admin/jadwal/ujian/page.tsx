@@ -13,7 +13,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/loading-state';
+import { Skeleton, TableSkeleton } from '@/components/ui/loading-state';
 import { cn } from '@/lib/utils';
 import { Kelas, MataPelajaran, TahunAjaran, KartuUjian, KartuUjianSummary } from '@/types/api';
 import { toast } from '@/components/ui/toast';
@@ -705,10 +705,7 @@ export default function AdminJadwalUjianPage() {
       {activeTab === 'list' && (
         <div>
           {isExamListLoading ? (
-            <div className="py-12 text-center text-foreground-muted space-y-2">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-              <p className="text-xs">Memuat daftar jadwal ujian...</p>
-            </div>
+            <TableSkeleton rows={4} columns={4} />
           ) : examList.length === 0 ? (
             <Card className="border-dashed border-2 border-border p-12 text-center">
               <div className="w-12 h-12 rounded-2xl bg-surface-muted flex items-center justify-center mx-auto mb-3 text-foreground-muted">

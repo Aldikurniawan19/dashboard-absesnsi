@@ -6,13 +6,21 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, LogOut, School } from 'lucide-react';
 import { LogoutDialog } from '@/components/layout/logout-dialog';
 
+import { formatNamaKelas } from '@/lib/utils';
+
 export function Navbar() {
   const { user, isWaliKelas, isAdmin } = useAuth();
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
+  const activePenugasan = user?.penugasan_wali_kelas?.find((p) => p.tahun_ajaran?.status === 'AKTIF') || user?.penugasan_wali_kelas?.[0];
+  const activeTahunAjaran = activePenugasan?.tahun_ajaran;
+
   const getRoleLabel = () => {
     if (isAdmin) return 'Administrator';
-    if (isWaliKelas) return 'Guru (Wali Kelas)';
+    if (isWaliKelas) {
+      const waliKelasClasses = user?.penugasan_wali_kelas?.map((p) => formatNamaKelas(p.kelas)).filter(Boolean) || [];
+      return waliKelasClasses.length > 0 ? `Wali Kelas ${waliKelasClasses.join(', ')}` : 'Guru (Wali Kelas)';
+    }
     return 'Guru Mapel';
   };
 
@@ -31,7 +39,7 @@ export function Navbar() {
           <Calendar className="w-3.5 h-3.5" />
           <span>Tahun Ajaran</span>
           <Badge variant="success" className="ml-1 text-xs">
-            2024/2025 Ganjil
+            {activeTahunAjaran ? `${activeTahunAjaran.nama} ${activeTahunAjaran.semester}` : '2024/2025 Ganjil'}
           </Badge>
         </div>
       </div>

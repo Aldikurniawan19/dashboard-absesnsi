@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/loading-state';
+import { Skeleton, TableSkeleton } from '@/components/ui/loading-state';
 import { cn, getHariName } from '@/lib/utils';
 import { JadwalPelajaran, Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
 import { toast } from '@/components/ui/toast';
@@ -1526,10 +1526,7 @@ export default function AdminJadwalPage() {
           {examActiveTab === 'list' && (
             <div className="space-y-4">
               {isExamsLoading ? (
-                <div className="p-12 text-center text-sm text-foreground-muted">
-                  <Loader2 className="w-7 h-7 animate-spin mx-auto mb-3 text-primary" />
-                  <span>Memuat daftar jadwal ujian...</span>
-                </div>
+                <TableSkeleton rows={4} columns={4} />
               ) : examList.length === 0 ? (
                 <div className="border border-dashed border-border rounded-xl p-12 text-center space-y-4 bg-surface-muted/30">
                   <FileSpreadsheet className="w-12 h-12 text-foreground-muted/60 mx-auto" />
