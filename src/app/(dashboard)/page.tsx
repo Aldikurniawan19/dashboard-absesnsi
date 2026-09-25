@@ -95,10 +95,12 @@ export default function DashboardPage() {
     return <PageSkeleton />;
   }
 
+  const firstName = user?.nama ? user.nama.trim().split(/\s+/)[0] : 'Pengguna';
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Selamat Datang, ${user?.nama || 'Pengguna'}`}
+        title={`Selamat Datang, ${firstName}`}
         description={`${
           isAdmin
             ? 'Panel Administrasi Sekolah dan Pengelolaan Data Master'
