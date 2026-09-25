@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 
 interface LocationPickerMapProps {
-  latitude: number | '';
-  longitude: number | '';
+  latitude: number | string;
+  longitude: number | string;
   radiusMeter: number;
   onLocationChange: (lat: number, lng: number) => void;
   onRadiusChange: (radius: number) => void;
@@ -61,10 +61,19 @@ export function LocationPickerMap({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResultsDropdown, setShowResultsDropdown] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-  const [activePreset, setActivePreset] = useState<number | null>(radiusMeter);
 
-  const curLat = typeof latitude === 'number' && !isNaN(latitude) ? latitude : DEFAULT_LAT;
-  const curLng = typeof longitude === 'number' && !isNaN(longitude) ? longitude : DEFAULT_LNG;
+  const hasValidCoords =
+    latitude !== '' &&
+    latitude !== null &&
+    latitude !== undefined &&
+    longitude !== '' &&
+    longitude !== null &&
+    longitude !== undefined &&
+    !isNaN(Number(latitude)) &&
+    !isNaN(Number(longitude));
+
+  const curLat = hasValidCoords ? Number(latitude) : DEFAULT_LAT;
+  const curLng = hasValidCoords ? Number(longitude) : DEFAULT_LNG;
 
   // 1. Load Leaflet CSS & JS dynamically (Zero SSR conflicts)
   useEffect(() => {
@@ -199,14 +208,17 @@ export function LocationPickerMap({
   // 3. Update Marker & Circle when latitude / longitude props change
   useEffect(() => {
     if (!mapInstanceRef.current || !markerRef.current || !circleRef.current) return;
-    if (typeof latitude === 'number' && typeof longitude === 'number' && !isNaN(latitude) && !isNaN(longitude)) {
+    if (hasValidCoords) {
+      const numLat = Number(latitude);
+      const numLng = Number(longitude);
       const curPos = markerRef.current.getLatLng();
-      if (curPos.lat !== latitude || curPos.lng !== longitude) {
-        markerRef.current.setLatLng([latitude, longitude]);
-        circleRef.current.setLatLng([latitude, longitude]);
+      if (Math.abs(curPos.lat - numLat) > 0.00001 || Math.abs(curPos.lng - numLng) > 0.00001) {
+        markerRef.current.setLatLng([numLat, numLng]);
+        circleRef.current.setLatLng([numLat, numLng]);
+        mapInstanceRef.current.setView([numLat, numLng], mapInstanceRef.current.getZoom() || 16);
       }
     }
-  }, [latitude, longitude]);
+  }, [latitude, longitude, hasValidCoords]);
 
   // 4. Update Circle radius when radiusMeter prop changes
   useEffect(() => {
@@ -698,7 +710,6 @@ export function LocationPickerMap({
             onChange={(e) => {
               const val = Number(e.target.value);
               onRadiusChange(val);
-              setActivePreset(val);
             }}
             className="flex-1 h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
           />
@@ -714,7 +725,6 @@ export function LocationPickerMap({
               type="button"
               onClick={() => {
                 onRadiusChange(r);
-                setActivePreset(r);
               }}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors border ${
                 radiusMeter === r
