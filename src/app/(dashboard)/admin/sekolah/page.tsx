@@ -11,6 +11,8 @@ import { Sekolah } from '@/types/api';
 import { toast } from '@/components/ui/toast';
 import { CheckCircle2, MapPin, Save, Settings, ShieldAlert, Smartphone } from 'lucide-react';
 
+import { LocationPickerMap } from '@/components/maps/location-picker-map';
+
 export default function AdminSekolahPage() {
   const queryClient = useQueryClient();
   const [nama, setNama] = useState('');
@@ -126,24 +128,50 @@ export default function AdminSekolahPage() {
               <CardTitle>Validasi Lokasi GPS (Geofencing)</CardTitle>
             </div>
             <CardDescription>
-              Jika diaktifkan, siswa yang melakukan scan QR di luar radius sekolah akan ditolak secara otomatis
+              Tentukan titik koordinat sekolah dan batas radius jangkauan presensi siswa secara interaktif menggunakan peta
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="flex items-center gap-3 p-4 rounded-lg bg-background border border-border">
               <input
                 type="checkbox"
                 id="wajib-gps-toggle"
                 checked={wajibGps}
                 onChange={(e) => setWajibGps(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
               />
-              <label htmlFor="wajib-gps-toggle" className="text-sm font-medium text-foreground cursor-pointer">
+              <label htmlFor="wajib-gps-toggle" className="text-sm font-medium text-foreground cursor-pointer select-none">
                 Wajibkan Siswa Berada di Titik Lokasi Sekolah Saat Scan QR
               </label>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            {/* Peta Interaktif Leaflet + OpenStreetMap */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground">
+                  Peta Lokasi &amp; Lingkaran Jangkauan Wilayah Absensi:
+                </span>
+                <span className="text-[11px] text-foreground-muted">
+                  Didukung OpenStreetMap &amp; Leaflet.js
+                </span>
+              </div>
+              <LocationPickerMap
+                latitude={latSekolah}
+                longitude={lngSekolah}
+                radiusMeter={radiusMeter}
+                schoolNameHint={nama}
+                onLocationChange={(lat, lng) => {
+                  setLatSekolah(lat);
+                  setLngSekolah(lng);
+                }}
+                onRadiusChange={(r) => {
+                  setRadiusMeter(r);
+                }}
+              />
+            </div>
+
+            {/* Input Manual Koordinat untuk Fine-Tuning */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border">
               <Input
                 label="Latitude Titik Sekolah"
                 type="number"
@@ -151,6 +179,7 @@ export default function AdminSekolahPage() {
                 placeholder="misal: -6.1685"
                 value={latSekolah}
                 onChange={(e) => setLatSekolah(e.target.value === '' ? '' : Number(e.target.value))}
+                helperText="Otomatis terisi saat memilih lokasi di peta"
               />
               <Input
                 label="Longitude Titik Sekolah"
@@ -159,6 +188,7 @@ export default function AdminSekolahPage() {
                 placeholder="misal: 106.837"
                 value={lngSekolah}
                 onChange={(e) => setLngSekolah(e.target.value === '' ? '' : Number(e.target.value))}
+                helperText="Otomatis terisi saat memilih lokasi di peta"
               />
               <Input
                 label="Radius Maksimal (Meter)"
@@ -167,7 +197,7 @@ export default function AdminSekolahPage() {
                 max={2000}
                 value={radiusMeter}
                 onChange={(e) => setRadiusMeter(Number(e.target.value))}
-                helperText="Jarak toleransi GPS dari titik tengah"
+                helperText="Jarak toleransi absensi dari titik tengah"
               />
             </div>
           </CardContent>
