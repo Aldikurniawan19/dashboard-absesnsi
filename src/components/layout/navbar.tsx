@@ -2,14 +2,16 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useSidebar } from '@/hooks/use-sidebar';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, LogOut, School } from 'lucide-react';
+import { Calendar, LogOut, Menu, School } from 'lucide-react';
 import { LogoutDialog } from '@/components/layout/logout-dialog';
 
 import { formatNamaKelas } from '@/lib/utils';
 
 export function Navbar() {
   const { user, isWaliKelas, isAdmin } = useAuth();
+  const { isMobileOpen, isDesktopCollapsed, toggleSidebar } = useSidebar();
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   const activePenugasan = user?.penugasan_wali_kelas?.find((p) => p.tahun_ajaran?.status === 'AKTIF') || user?.penugasan_wali_kelas?.[0];
@@ -25,17 +27,35 @@ export function Navbar() {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-surface px-6 flex items-center justify-between sticky top-0 z-30 shadow-subtle">
-      {/* Sisi Kiri: Informasi Sekolah & Tahun Ajaran */}
-      <div className="flex items-center gap-3">
+    <header className="h-16 border-b border-border bg-surface px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-subtle">
+      {/* Sisi Kiri: Tombol Hamburger & Informasi Sekolah */}
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        {/* Tombol Hamburger (Desktop & Mobile) */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={
+            isDesktopCollapsed
+              ? 'Buka menu navigasi'
+              : isMobileOpen
+                ? 'Tutup menu navigasi'
+                : 'Alihkan menu navigasi'
+          }
+          aria-expanded={!isDesktopCollapsed}
+          title={isDesktopCollapsed ? 'Perluas menu (tampilkan teks)' : 'Ciutkan menu (hanya ikon)'}
+          className="p-2 -ml-1 rounded-lg text-foreground-muted hover:text-foreground hover:bg-background border border-border/70 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 shrink-0"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
         <div className="flex items-center gap-2 text-xs text-foreground-muted">
-          <School className="w-4 h-4 text-primary" />
-          <span className="font-medium text-foreground">
+          <School className="w-4 h-4 text-primary shrink-0" />
+          <span className="font-medium text-foreground truncate max-w-[120px] sm:max-w-xs">
             {user?.sekolah?.nama || 'SMA Negeri 1'}
           </span>
         </div>
-        <span className="text-border">|</span>
-        <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+        <span className="hidden sm:inline text-border">|</span>
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-foreground-muted">
           <Calendar className="w-3.5 h-3.5" />
           <span>Tahun Ajaran</span>
           <Badge variant="success" className="ml-1 text-xs">
