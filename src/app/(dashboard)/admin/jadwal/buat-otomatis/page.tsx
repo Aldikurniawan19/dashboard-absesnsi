@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Kelas, TahunAjaran } from '@/types/api';
+import { Kelas, TahunAjaran, PilihanMapelSummary } from '@/types/api';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toast';
 import {
@@ -26,6 +26,7 @@ import {
   GraduationCap,
   Info,
   Layers,
+  ListFilter,
   Loader2,
   RefreshCw,
   Settings2,
@@ -39,7 +40,7 @@ export default function BuatJadwalOtomatisPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Wizard Step (1: Parameter & Rombel, 2: Struktur Kurikulum, 3: Pratinjau & Publikasi)
+  // Wizard Step (1: Parameter & Rombel, 2: Struktur Kurikulum & KRS, 3: Pratinjau & Publikasi)
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Form State
@@ -53,7 +54,7 @@ export default function BuatJadwalOtomatisPage() {
   // Hasil Simulasi
   const [previewResult, setPreviewResult] = useState<any | null>(null);
   const [previewKelasId, setPreviewKelasId] = useState<string>('');
-  const [previewViewMode, setPreviewViewMode] = useState<'jadwal' | 'guru'>('jadwal');
+  const [previewViewMode, setPreviewViewMode] = useState<'jadwal' | 'guru' | 'rombel'>('jadwal');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -89,6 +90,17 @@ export default function BuatJadwalOtomatisPage() {
   const filteredTargetKelas = useMemo(() => {
     return (kelasList || []).filter((k) => selectedTingkat.includes(k.tingkat));
   }, [kelasList, selectedTingkat]);
+
+  // 3. Fetch Summary KRS Siswa Fase F (Kelas 11 & 12)
+  const { data: krsSummary } = useQuery<PilihanMapelSummary>({
+    queryKey: ['pilihan-mapel-summary', selectedTahunId],
+    queryFn: async () => {
+      if (!selectedTahunId) return null;
+      const res = await api.get(`/jadwal/pilihan-mapel/summary?tahun_ajaran_id=${selectedTahunId}`);
+      return res.data?.data ?? res.data;
+    },
+    enabled: !!selectedTahunId,
+  });
 
   // Mutasi 1: Simulasi / Preview Generator SMA
   const previewMutation = useMutation({
@@ -182,12 +194,20 @@ export default function BuatJadwalOtomatisPage() {
     );
   }, [previewResult, previewKelasId]);
 
+  // Selected class summary info
+  const selectedClassSummary = useMemo(() => {
+    if (!previewResult || !previewKelasId) return null;
+    return (previewResult.class_summaries || []).find(
+      (c: any) => c.kelas_id === previewKelasId,
+    );
+  }, [previewResult, previewKelasId]);
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* Header Utama Halaman Penuh */}
       <PageHeader
-        title="Buat Jadwal Otomatis (Khusus SMA)"
-        description="Penyusunan jadwal semester cerdas bebas bentrok sesuai standar Kurikulum Merdeka (Fase E & Fase F)"
+        title="Buat Jadwal Otomatis (Kurikulum Merdeka SMA)"
+        description="Penyusunan jadwal semester cerdas bebas bentrok sesuai Permendikbudristek No. 12/2024 (Fase E & Fase F dengan sinkronisasi KRS)"
         actions={
           <Button
             variant="outline"
@@ -230,7 +250,7 @@ export default function BuatJadwalOtomatisPage() {
                   className={cn(
                     'flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all',
                     step >= 1
-                      ? 'bg-primary text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-xs'
                       : 'bg-surface border border-border text-foreground-muted',
                   )}
                 >
@@ -252,7 +272,7 @@ export default function BuatJadwalOtomatisPage() {
                   className={cn(
                     'flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all',
                     step >= 2
-                      ? 'bg-primary text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-xs'
                       : 'bg-surface border border-border text-foreground-muted',
                   )}
                 >
@@ -262,7 +282,7 @@ export default function BuatJadwalOtomatisPage() {
                   <span className={cn('text-xs font-bold block', step === 2 ? 'text-primary' : 'text-foreground-muted')}>
                     Langkah 2
                   </span>
-                  <span className="text-[11px] text-foreground-muted">Struktur Kurikulum</span>
+                  <span className="text-[11px] text-foreground-muted">Kurikulum & Status KRS</span>
                 </div>
               </div>
 
@@ -274,7 +294,7 @@ export default function BuatJadwalOtomatisPage() {
                   className={cn(
                     'flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all',
                     step >= 3
-                      ? 'bg-primary text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-xs'
                       : 'bg-surface border border-border text-foreground-muted',
                   )}
                 >
@@ -291,7 +311,7 @@ export default function BuatJadwalOtomatisPage() {
 
             <Badge variant="info" className="self-start sm:self-center text-xs py-1 px-3 gap-1.5 font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Standar Kurikulum Merdeka SMA</span>
+              <span>Permendikbudristek No. 12/2024</span>
             </Badge>
           </div>
         </CardContent>
@@ -362,19 +382,19 @@ export default function BuatJadwalOtomatisPage() {
                       tingkat: 10,
                       badge: 'Fase E',
                       label: 'Kelas X SMA',
-                      desc: 'Mempelajari 15 mata pelajaran fondasi umum (IPA, IPS, Umum) tanpa peminatan/penjurusan.',
+                      desc: 'Mempelajari 10 mata pelajaran fondasi umum (IPA terpadu, IPS terpadu, Umum) tanpa peminatan kaku.',
                     },
                     {
                       tingkat: 11,
                       badge: 'Fase F',
                       label: 'Kelas XI SMA',
-                      desc: 'Mata pelajaran wajib umum + Kelompok Pilihan Kejuruan/Peminatan (MIPA, IPS, Bahasa).',
+                      desc: '8 Mapel Wajib Umum (21 JP) + 4 s/d 5 Mapel Pilihan KRS (16 JP) sesuai minat karier siswa.',
                     },
                     {
                       tingkat: 12,
                       badge: 'Fase F',
                       label: 'Kelas XII SMA',
-                      desc: 'Mata pelajaran wajib umum + Pendalaman Peminatan (MIPA, IPS, Bahasa).',
+                      desc: '8 Mapel Wajib Umum (21 JP) + 4 s/d 5 Mapel Pilihan KRS (16 JP) persiapan perguruan tinggi.',
                     },
                   ].map((item) => {
                     const isChecked = selectedTingkat.includes(item.tingkat);
@@ -385,7 +405,7 @@ export default function BuatJadwalOtomatisPage() {
                         className={cn(
                           'cursor-pointer border-2 rounded-xl p-4 transition-all flex flex-col justify-between space-y-3',
                           isChecked
-                            ? 'border-primary bg-primary/5 shadow-sm'
+                            ? 'border-primary bg-primary/5 shadow-xs'
                             : 'border-border bg-surface hover:border-border-focus',
                         )}
                       >
@@ -421,7 +441,7 @@ export default function BuatJadwalOtomatisPage() {
                     Rombongan Belajar Terpilih ({filteredTargetKelas.length} Kelas):
                   </span>
                   <span className="text-xs text-foreground-muted">
-                    Semua rombel ini akan dijadwalkan secara simultan tanpa bentrok
+                    Semua rombel ini akan dijadwalkan secara simultan tanpa bentrok guru & ruang
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -458,7 +478,7 @@ export default function BuatJadwalOtomatisPage() {
               Batal
             </Button>
             <Button variant="primary" onClick={() => setStep(2)} className="gap-2">
-              <span>Lanjut: Tinjau Struktur Kurikulum</span>
+              <span>Lanjut: Tinjau Struktur Kurikulum & KRS</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </div>
@@ -466,18 +486,51 @@ export default function BuatJadwalOtomatisPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* LANGKAH 2: REVIEW STRUKTUR KURIKULUM SMA                              */}
+      {/* LANGKAH 2: REVIEW STRUKTUR KURIKULUM SMA & STATUS KRS                 */}
       {/* ===================================================================== */}
       {step === 2 && (
         <div className="space-y-6">
+          {/* Status Sinkronisasi KRS Siswa Fase F */}
+          {selectedTingkat.some((t) => t >= 11) && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">
+                      Status Pengisian Pilihan Mapel (KRS) Siswa Kelas 11 & 12
+                    </h4>
+                    <p className="text-xs text-foreground-muted mt-0.5">
+                      {krsSummary?.metrics?.sudah_fiks || 0} dari {krsSummary?.total_siswa_fase_f || 0} siswa Fase F telah memiliki status KRS Fiks ({krsSummary?.metrics?.persentase_siap || 0}% tersinkron).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/admin/jadwal/pilihan-mapel')}
+                    className="gap-1.5 text-xs bg-background"
+                  >
+                    <Users className="w-3.5 h-3.5 text-primary" />
+                    <span>Kelola Pilihan Siswa</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-primary" />
-                <span>Ketentuan Alokasi Waktu Belajar SMA (Kurikulum Merdeka)</span>
+                <span>Ketentuan Beban Belajar SMA (Permendikbudristek No. 12/2024)</span>
               </CardTitle>
               <CardDescription>
-                Struktur Jam Pelajaran (JP) mengacu pada Permendikbudristek No. 12/2024 & Permendikdasmen No. 13/2025
+                Struktur total 37 JP per minggu (Senin–Kamis 8 JP, Jumat 5 JP selesai sebelum Sholat Jumat)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -513,9 +566,9 @@ export default function BuatJadwalOtomatisPage() {
                   <div className="flex items-center justify-between border-b border-border pb-2">
                     <div>
                       <h4 className="text-sm font-bold text-foreground">Fase E (Kelas X SMA)</h4>
-                      <p className="text-[11px] text-foreground-muted">Seluruh rombel fondasi umum</p>
+                      <p className="text-[11px] text-foreground-muted">10 Mapel Utama Fondasi Wajib</p>
                     </div>
-                    <Badge variant="info" className="text-xs font-semibold">15 Mapel (39 JP)</Badge>
+                    <Badge variant="info" className="text-xs font-semibold">37 JP / Minggu</Badge>
                   </div>
 
                   <div className="text-xs space-y-1.5 max-h-72 overflow-y-auto pr-2 text-foreground">
@@ -536,12 +589,18 @@ export default function BuatJadwalOtomatisPage() {
                       <strong className="text-foreground">4 JP (2+2)</strong>
                     </div>
                     <div className="flex justify-between py-1 border-b border-border/40">
-                      <span>IPA (Fisika, Kimia, Biologi)</span>
-                      <strong className="text-foreground">6 JP (@ 2 JP)</strong>
+                      <div>
+                        <span>IPA (Terpadu / Fisika, Kimia, Biologi)</span>
+                        <span className="text-[10px] text-foreground-muted block">Integrasi sains alam sesuai kesiapan sekolah</span>
+                      </div>
+                      <strong className="text-foreground">6 JP</strong>
                     </div>
                     <div className="flex justify-between py-1 border-b border-border/40">
-                      <span>IPS (Sosiologi, Ekonomi, Sejarah, Geografi)</span>
-                      <strong className="text-foreground">8 JP (@ 2 JP)</strong>
+                      <div>
+                        <span>IPS (Terpadu / Sosiologi, Ekonomi, Sejarah, Geografi)</span>
+                        <span className="text-[10px] text-foreground-muted block">Integrasi humaniora & ilmu sosial</span>
+                      </div>
+                      <strong className="text-foreground">8 JP</strong>
                     </div>
                     <div className="flex justify-between py-1 border-b border-border/40">
                       <span>Bahasa Inggris</span>
@@ -552,11 +611,17 @@ export default function BuatJadwalOtomatisPage() {
                       <strong className="text-primary">3 JP</strong>
                     </div>
                     <div className="flex justify-between py-1 border-b border-border/40">
-                      <span>Informatika</span>
+                      <div>
+                        <span>Informatika (Wajib)</span>
+                        <span className="text-[10px] text-foreground-muted block">Fondasi literasi digital abad 21</span>
+                      </div>
                       <strong className="text-foreground">3 JP</strong>
                     </div>
                     <div className="flex justify-between py-1">
-                      <span>Seni Budaya</span>
+                      <div>
+                        <span>Seni dan Budaya</span>
+                        <span className="text-[10px] text-foreground-muted block">Pilihan: Musik / Rupa / Teater / Tari</span>
+                      </div>
                       <strong className="text-foreground">2 JP</strong>
                     </div>
                   </div>
@@ -567,30 +632,23 @@ export default function BuatJadwalOtomatisPage() {
                   <div className="flex items-center justify-between border-b border-border pb-2">
                     <div>
                       <h4 className="text-sm font-bold text-foreground">Fase F (Kelas XI & XII SMA)</h4>
-                      <p className="text-[11px] text-foreground-muted">Kelompok Umum & Peminatan</p>
+                      <p className="text-[11px] text-foreground-muted">Kelompok Umum + 4 s/d 5 Mapel Pilihan KRS</p>
                     </div>
-                    <Badge variant="warning" className="text-xs font-semibold">Umum + Pilihan (38 JP)</Badge>
+                    <Badge variant="warning" className="text-xs font-semibold">37 s/d 41 JP / Minggu</Badge>
                   </div>
 
                   <div className="text-xs space-y-2 max-h-72 overflow-y-auto pr-2 text-foreground">
                     <div className="bg-background border border-border rounded-lg p-2.5 space-y-1">
-                      <span className="font-bold text-primary block">1. Kelompok Umum (Wajib Semua Rombel - 21 JP)</span>
+                      <span className="font-bold text-primary block">1. Kelompok A: Wajib Umum (8 Mapel = 21 JP)</span>
                       <p className="text-[11px] text-foreground-muted leading-relaxed">
-                        Agama (3 JP), PPKn (2 JP), B. Indonesia (3 JP), Matematika Umum (3 JP), B. Inggris (3 JP), PJOK (3 JP), Sejarah (2 JP), Seni Budaya (2 JP).
+                        Agama (3 JP), PPKn (2 JP), B. Indonesia (3 JP), Matematika (3 JP), B. Inggris (3 JP), PJOK (3 JP), Sejarah (2 JP), Seni Budaya (2 JP).
                       </p>
                     </div>
 
                     <div className="bg-background border border-border rounded-lg p-2.5 space-y-1">
-                      <span className="font-bold text-warning block">2. Peminatan MIPA (16-20 JP)</span>
+                      <span className="font-bold text-warning block">2. Kelompok B: Pilihan KRS (4 s/d 5 Mapel = 16–20 JP)</span>
                       <p className="text-[11px] text-foreground-muted leading-relaxed">
-                        Fisika (4 JP), Kimia (4 JP), Biologi (4 JP), Matematika Tingkat Lanjut (4 JP).
-                      </p>
-                    </div>
-
-                    <div className="bg-background border border-border rounded-lg p-2.5 space-y-1">
-                      <span className="font-bold text-info block">3. Peminatan IPS / Bahasa (16-20 JP)</span>
-                      <p className="text-[11px] text-foreground-muted leading-relaxed">
-                        Sosiologi (4 JP), Ekonomi (4 JP), Geografi (4 JP), Sejarah Tingkat Lanjut (4 JP) / Bahasa & Sastra.
+                        Siswa memilih 4 hingga 5 mata pelajaran pilihan (@ 4 JP) dari Rumpun MIPA, IPS, Bahasa & Budaya, atau Vokasi sesuai target program studi perguruan tinggi (misal: Paket Kedokteran, Teknik, Soshum/Hukum, Bahasa/HI).
                       </p>
                     </div>
                   </div>
@@ -635,7 +693,7 @@ export default function BuatJadwalOtomatisPage() {
       {step === 3 && previewResult && (
         <div className="space-y-6">
           {/* Hero Banner Zero Clash */}
-          <div className="bg-success-light border border-success/40 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-success shadow-sm">
+          <div className="bg-success-light border border-success/40 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-success shadow-xs">
             <div className="flex items-center gap-3">
               <ShieldCheck className="w-8 h-8 shrink-0" />
               <div>
@@ -699,7 +757,7 @@ export default function BuatJadwalOtomatisPage() {
                     className={cn(
                       'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
                       previewViewMode === 'jadwal'
-                        ? 'bg-primary text-white shadow-sm'
+                        ? 'bg-primary text-white shadow-xs'
                         : 'text-foreground-muted hover:text-foreground',
                     )}
                   >
@@ -711,11 +769,23 @@ export default function BuatJadwalOtomatisPage() {
                     className={cn(
                       'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
                       previewViewMode === 'guru'
-                        ? 'bg-primary text-white shadow-sm'
+                        ? 'bg-primary text-white shadow-xs'
                         : 'text-foreground-muted hover:text-foreground',
                     )}
                   >
-                    Distribusi Beban Mengajar Guru
+                    Distribusi Beban Guru
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewViewMode('rombel')}
+                    className={cn(
+                      'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
+                      previewViewMode === 'rombel'
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'text-foreground-muted hover:text-foreground',
+                    )}
+                  >
+                    Ringkasan Rombel & Jumlah Mapel
                   </button>
                 </div>
 
@@ -727,7 +797,7 @@ export default function BuatJadwalOtomatisPage() {
                         value={previewKelasId}
                         onChange={(e) => setPreviewKelasId(e.target.value)}
                         options={(previewResult.class_summaries || []).map((c: any) => ({
-                          label: `${c.kelas_nama} (${c.total_jp} JP — ${c.total_mapel} Mapel)`,
+                          label: `${c.kelas_nama} (${c.total_jp} JP — ${c.is_krs_based ? 'KRS Siswa' : 'Paket Kurikulum'})`,
                           value: c.kelas_id,
                         }))}
                       />
@@ -747,6 +817,7 @@ export default function BuatJadwalOtomatisPage() {
                         <TableHead className="w-28 font-bold">Hari</TableHead>
                         <TableHead className="w-36 font-bold">Waktu & Sesi</TableHead>
                         <TableHead className="font-bold">Mata Pelajaran</TableHead>
+                        <TableHead className="w-36 font-bold">Kategori</TableHead>
                         <TableHead className="font-bold">Guru Pengampu</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -775,6 +846,14 @@ export default function BuatJadwalOtomatisPage() {
                               </span>
                             </TableCell>
                             <TableCell>
+                              <Badge
+                                variant={s.is_pilihan ? 'warning' : 'outline'}
+                                className="text-[11px] font-medium"
+                              >
+                                {s.is_pilihan ? `Pilihan (${s.rumpun || 'Fase F'})` : 'Wajib Umum'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
                               <span className="font-semibold text-foreground text-xs block">
                                 {s.guru_nama}
                               </span>
@@ -786,7 +865,7 @@ export default function BuatJadwalOtomatisPage() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-xs text-foreground-muted">
+                          <TableCell colSpan={5} className="text-center py-8 text-xs text-foreground-muted">
                             Tidak ada jadwal untuk rombel ini.
                           </TableCell>
                         </TableRow>
@@ -827,6 +906,78 @@ export default function BuatJadwalOtomatisPage() {
                             <p className="text-[11px] text-foreground-muted mt-0.5">
                               Mengajar di: {tw.kelas_names.join(', ')}
                             </p>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Mode 3: Ringkasan Rombel & Jumlah Mapel */}
+              {previewViewMode === 'rombel' && (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-surface-muted/50">
+                        <TableHead className="font-bold">Rombel Kelas</TableHead>
+                        <TableHead className="font-bold">Fase Kurikulum</TableHead>
+                        <TableHead className="text-center font-bold">Total Mapel</TableHead>
+                        <TableHead className="text-center font-bold">Total Beban</TableHead>
+                        <TableHead className="text-center font-bold">Total Sesi</TableHead>
+                        <TableHead className="font-bold">Status Kurikulum & Pilihan</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(previewResult.class_summaries || []).map((cs: any) => (
+                        <TableRow key={cs.kelas_id} className="hover:bg-surface-muted/30">
+                          <TableCell className="font-bold text-foreground text-xs">
+                            {cs.kelas_nama}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <Badge variant={cs.tingkat === 10 ? 'success' : 'info'} className="text-[11px] font-medium">
+                              {cs.tingkat === 10 ? 'Fase E (Kelas X)' : `Fase F (Kelas ${cs.tingkat === 11 ? 'XI' : 'XII'})`}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={
+                                cs.tingkat === 10
+                                  ? cs.total_mapel >= 10
+                                    ? 'success'
+                                    : 'danger'
+                                  : cs.total_mapel >= 12
+                                  ? 'success'
+                                  : 'danger'
+                              }
+                              className="font-bold text-xs"
+                            >
+                              {cs.total_mapel} Mapel
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center font-bold text-xs text-foreground">
+                            {cs.total_jp} JP
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-foreground-muted">
+                            {cs.total_sesi} Sesi
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {cs.tingkat === 10 ? (
+                              <span className="text-foreground-muted">
+                                10 Mapel Fondasi Utama Kurikulum Merdeka
+                              </span>
+                            ) : (
+                              <div>
+                                <span className="font-medium text-foreground">
+                                  8 Wajib Umum + {cs.mapel_pilihan_names?.length || (cs.total_mapel - 8)} Pilihan KRS
+                                </span>
+                                {cs.mapel_pilihan_names && cs.mapel_pilihan_names.length > 0 && (
+                                  <p className="text-[11px] text-primary mt-0.5">
+                                    Pilihan: {cs.mapel_pilihan_names.join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

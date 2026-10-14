@@ -16,7 +16,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { toast } from '@/components/ui/toast';
 import { TableSkeleton } from '@/components/ui/loading-state';
 import { CheckCircle2, GraduationCap, Plus, Search, Shield, UserCheck, Users } from 'lucide-react';
-import { Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
+import { Jurusan, Kelas, MataPelajaran, TahunAjaran } from '@/types/api';
 
 export default function AdminPenggunaPage() {
   const queryClient = useQueryClient();
@@ -26,6 +26,7 @@ export default function AdminPenggunaPage() {
 
   const [filterTingkatSiswa, setFilterTingkatSiswa] = useState<string>('ALL');
   const [siswaPage, setSiswaPage] = useState<number>(1);
+  const [guruPage, setGuruPage] = useState<number>(1);
 
   // Modal Siswa
   const [isSiswaModalOpen, setIsSiswaModalOpen] = useState(false);
@@ -45,11 +46,22 @@ export default function AdminPenggunaPage() {
 
   // Modal Penugasan Wali Kelas
   const [isWaliModalOpen, setIsWaliModalOpen] = useState(false);
+  const [selectedGuru, setSelectedGuru] = useState<any>(null);
   const [selectedGuruId, setSelectedGuruId] = useState('');
+  const [selectedJurusanId, setSelectedJurusanId] = useState('');
   const [selectedKelasId, setSelectedKelasId] = useState('');
   const [selectedTahunId, setSelectedTahunId] = useState('');
 
   // Reference Queries
+  const { data: jurusanList = [] } = useQuery<Jurusan[]>({
+    queryKey: ['jurusan-list'],
+    queryFn: async () => {
+      const res = await api.get('/master/jurusan');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
   const { data: kelasList = [] } = useQuery<Kelas[]>({
     queryKey: ['kelas-list'],
     queryFn: async () => {
@@ -77,6 +89,21 @@ export default function AdminPenggunaPage() {
     },
   });
 
+  // Filter kelas berdasarkan jurusan yang dipilih
+  const availableKelasForJurusan = React.useMemo(() => {
+    if (!selectedJurusanId) return [];
+    return (kelasList || [])
+      .filter((k) => k.jurusan_id === selectedJurusanId)
+      .sort((a, b) => {
+        if (a.tingkat !== b.tingkat) return a.tingkat - b.tingkat;
+        return (a.nama_rombel || '').localeCompare(b.nama_rombel || '', undefined, { numeric: true });
+      });
+  }, [kelasList, selectedJurusanId]);
+
+  const selectedKelasObj = React.useMemo(() => {
+    return (kelasList || []).find((k) => k.id === selectedKelasId);
+  }, [kelasList, selectedKelasId]);
+
   // Data Siswa
   const { data: siswaRes, refetch: refetchSiswa, isLoading: isSiswaLoading } = useQuery({
     queryKey: ['siswa-list', activeTab === 'siswa' ? search : '', filterTingkatSiswa, siswaPage],
@@ -98,10 +125,15 @@ export default function AdminPenggunaPage() {
 
   // Data Guru
   const { data: guruRes, refetch: refetchGuru, isLoading: isGuruLoading } = useQuery({
-    queryKey: ['guru-list', activeTab === 'guru' ? search : ''],
+    queryKey: ['guru-list', activeTab === 'guru' ? search : '', guruPage],
     queryFn: async () => {
-      const searchParam = activeTab === 'guru' && search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await api.get(`/users/guru${searchParam}`);
+      const params = new URLSearchParams();
+      params.append('page', String(guruPage));
+      params.append('limit', '20');
+      if (activeTab === 'guru' && search) {
+        params.append('search', search);
+      }
+      const res = await api.get(`/users/guru?${params.toString()}`);
       return res.data;
     },
   });
@@ -147,6 +179,9 @@ export default function AdminPenggunaPage() {
   const totalGuru = typeof guruRes?.meta?.total === 'number'
     ? guruRes.meta.total
     : guruList.length;
+  const totalPagesGuru = typeof guruRes?.meta?.totalPages === 'number'
+    ? guruRes.meta.totalPages
+    : Math.ceil(totalGuru / 20);
 
   const adminList = Array.isArray(adminRes?.data)
     ? adminRes.data
@@ -220,6 +255,63 @@ export default function AdminPenggunaPage() {
     },
   });
 
+  const handleOpenAssignWali = (g: any) => {
+    setSelectedGuru(g);
+    setSelectedGuruId(g?.id || '');
+
+    const existingWali = g?.penugasan_wali_kelas?.[0];
+    if (existingWali?.kelas) {
+      const kelasObj = existingWali.kelas;
+      const jId = kelasObj.jurusan_id || (jurusanList.length > 0 ? jurusanList[0].id : '');
+      setSelectedJurusanId(jId);
+      setSelectedKelasId(existingWali.kelas_id);
+      setSelectedTahunId(existingWali.tahun_ajaran_id);
+    } else {
+      const activeTahun = tahunAjaranList.find((t) => t.status === 'AKTIF') || tahunAjaranList[0];
+      if (activeTahun) {
+        setSelectedTahunId(activeTahun.id);
+      } else {
+        setSelectedTahunId('');
+      }
+
+      const firstJurusan = jurusanList.length > 0 ? jurusanList[0] : null;
+      if (firstJurusan) {
+        setSelectedJurusanId(firstJurusan.id);
+        const matchingKelas = (kelasList || [])
+          .filter((k) => k.jurusan_id === firstJurusan.id)
+          .sort((a, b) => {
+            if (a.tingkat !== b.tingkat) return a.tingkat - b.tingkat;
+            return (a.nama_rombel || '').localeCompare(b.nama_rombel || '', undefined, { numeric: true });
+          });
+        if (matchingKelas.length > 0) {
+          setSelectedKelasId(matchingKelas[0].id);
+        } else {
+          setSelectedKelasId('');
+        }
+      } else {
+        setSelectedJurusanId('');
+        setSelectedKelasId('');
+      }
+    }
+
+    setIsWaliModalOpen(true);
+  };
+
+  const handleJurusanChange = (jurusanId: string) => {
+    setSelectedJurusanId(jurusanId);
+    const matchingKelas = (kelasList || [])
+      .filter((k) => k.jurusan_id === jurusanId)
+      .sort((a, b) => {
+        if (a.tingkat !== b.tingkat) return a.tingkat - b.tingkat;
+        return (a.nama_rombel || '').localeCompare(b.nama_rombel || '', undefined, { numeric: true });
+      });
+    if (matchingKelas.length > 0) {
+      setSelectedKelasId(matchingKelas[0].id);
+    } else {
+      setSelectedKelasId('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -242,6 +334,7 @@ export default function AdminPenggunaPage() {
           setSearch('');
           setFilterTingkatSiswa('ALL');
           setSiswaPage(1);
+          setGuruPage(1);
         }}
         items={[
           { id: 'siswa', label: 'Data Siswa', count: totalSiswa, icon: <GraduationCap className="w-4 h-4" /> },
@@ -364,27 +457,14 @@ export default function AdminPenggunaPage() {
                 <Input
                   placeholder="Cari nama, NIP, atau email guru..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setGuruPage(1);
+                  }}
                   className="pl-9"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const firstGuru = guruList.length > 0 ? guruList[0] : null;
-                    if (firstGuru) setSelectedGuruId(firstGuru.id);
-                    if (Array.isArray(kelasList) && kelasList[0]) setSelectedKelasId(kelasList[0].id);
-                    if (Array.isArray(tahunAjaranList) && tahunAjaranList[0]) setSelectedTahunId(tahunAjaranList[0].id);
-                    setIsWaliModalOpen(true);
-                  }}
-                  className="gap-1.5"
-                >
-                  <UserCheck className="w-4 h-4 text-primary" />
-                  <span>Tugaskan Wali Kelas</span>
-                </Button>
-
                 <Button
                   variant="primary"
                   size="sm"
@@ -398,47 +478,72 @@ export default function AdminPenggunaPage() {
             </div>
 
             {isGuruLoading ? (
-              <TableSkeleton rows={8} columns={4} />
+              <TableSkeleton rows={8} columns={5} />
             ) : guruList.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama Guru & NIP</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Mata Pelajaran Diampu</TableHead>
-                    <TableHead>Penugasan Wali Kelas</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {guruList.map((g: any) => {
-                    const mapelNames = Array.isArray(g?.guru_mapel) ? g.guru_mapel.map((m: any) => m?.mapel?.nama).filter(Boolean).join(', ') : '';
-                    const waliKelas = g?.penugasan_wali_kelas?.[0];
-                    return (
-                      <TableRow key={g?.id}>
-                        <TableCell>
-                          <div className="font-semibold text-foreground">{g?.nama}</div>
-                          <div className="text-xs text-foreground-muted mt-0.5">
-                            {g?.nip ? `NIP. ${g.nip}` : <span className="italic">NIP belum terdaftar</span>}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-foreground-muted">{g?.email}</TableCell>
-                        <TableCell className="text-xs text-foreground max-w-xs">
-                          {mapelNames || <span className="italic text-foreground-muted">Belum ada</span>}
-                        </TableCell>
-                        <TableCell>
-                          {waliKelas ? (
-                            <Badge variant="warning">
-                              Kelas {waliKelas.kelas?.tingkat} {waliKelas.kelas?.jurusan?.kode} {waliKelas.kelas?.nama_rombel}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-foreground-muted italic">-</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nama Guru & NIP</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Mata Pelajaran Diampu</TableHead>
+                      <TableHead>Penugasan Wali Kelas</TableHead>
+                      <TableHead className="w-48 text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {guruList.map((g: any) => {
+                      const mapelNames = Array.isArray(g?.guru_mapel) ? g.guru_mapel.map((m: any) => m?.mapel?.nama).filter(Boolean).join(', ') : '';
+                      const waliKelas = g?.penugasan_wali_kelas?.[0];
+                      return (
+                        <TableRow key={g?.id}>
+                          <TableCell>
+                            <div className="font-semibold text-foreground">{g?.nama}</div>
+                            <div className="text-xs text-foreground-muted mt-0.5">
+                              {g?.nip ? `NIP. ${g.nip}` : <span className="italic">NIP belum terdaftar</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-foreground-muted">{g?.email}</TableCell>
+                          <TableCell className="text-xs text-foreground max-w-xs">
+                            {mapelNames || <span className="italic text-foreground-muted">Belum ada</span>}
+                          </TableCell>
+                          <TableCell>
+                            {waliKelas ? (
+                              <Badge variant="warning">
+                                Kelas {waliKelas.kelas?.tingkat} {waliKelas.kelas?.jurusan?.kode} {waliKelas.kelas?.nama_rombel}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-foreground-muted italic">Bukan Wali Kelas</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenAssignWali(g)}
+                              className="gap-1.5 ml-auto text-xs"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 text-primary" />
+                              <span>{waliKelas ? 'Ubah Wali Kelas' : 'Tugaskan Wali Kelas'}</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                <Pagination
+                  currentPage={guruPage}
+                  totalPages={totalPagesGuru}
+                  totalItems={totalGuru}
+                  pageSize={20}
+                  onPageChange={setGuruPage}
+                  itemLabel="guru"
+                  hideOnSinglePage={true}
+                />
+              </div>
             ) : (
               <div className="py-8 text-center text-xs text-foreground-muted border border-dashed border-border rounded-lg">
                 Tidak ada data guru untuk pencarian ini.
@@ -653,9 +758,12 @@ export default function AdminPenggunaPage() {
       {/* MODAL TUGASKAN WALI KELAS */}
       <Dialog
         isOpen={isWaliModalOpen}
-        onClose={() => setIsWaliModalOpen(false)}
+        onClose={() => {
+          setIsWaliModalOpen(false);
+          setSelectedGuru(null);
+        }}
         title="Tugaskan Guru Sebagai Wali Kelas"
-        description="Penugasan wali kelas dicatat per tahun ajaran untuk menjaga riwayat"
+        description="Pilih jurusan, rombongan belajar kelas, dan periode tahun ajaran perwalian"
         isLoading={assignWaliMutation.isPending}
         loadingMessage="Menyimpan penugasan wali kelas..."
       >
@@ -666,41 +774,104 @@ export default function AdminPenggunaPage() {
           }}
           className="space-y-4 py-2"
         >
-          <Select
-            label="Pilih Guru"
-            value={selectedGuruId}
-            onChange={(e) => setSelectedGuruId(e.target.value)}
-            options={guruList.map((g: any) => ({
-              label: `${g?.nama ?? ''} (${g?.nip ?? ''})`,
-              value: g?.id ?? '',
-            }))}
-          />
+          {/* Info Guru Terpilih */}
+          <div className="p-3 bg-background-hover/50 rounded-lg border border-border/60 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+              <UserCheck className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="text-xs text-foreground-muted font-medium">Guru yang Ditugaskan:</div>
+              <div className="font-semibold text-foreground text-sm truncate">{selectedGuru?.nama || '-'}</div>
+              <div className="text-xs text-foreground-muted flex flex-wrap items-center gap-2">
+                <span>{selectedGuru?.nip ? `NIP. ${selectedGuru.nip}` : selectedGuru?.email}</span>
+                {selectedGuru?.penugasan_wali_kelas?.[0]?.kelas && (
+                  <Badge variant="warning" className="text-[10px] py-0 px-1.5 font-normal">
+                    Saat ini: Kelas {selectedGuru.penugasan_wali_kelas[0].kelas.tingkat} {selectedGuru.penugasan_wali_kelas[0].kelas.jurusan?.kode} {selectedGuru.penugasan_wali_kelas[0].kelas.nama_rombel}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
 
-          <Select
-            label="Pilih Kelas yang Diwalikan"
-            value={selectedKelasId}
-            onChange={(e) => setSelectedKelasId(e.target.value)}
-            options={(Array.isArray(kelasList) ? kelasList : []).map((k) => ({
-              label: k?.nama_lengkap || `Kelas ${k?.tingkat ?? ''} ${k?.nama_rombel ?? ''}`,
-              value: k?.id ?? '',
-            }))}
-          />
+          {/* Pemilihan Kelas Terpisah: Jurusan & Rombel Berdampingan */}
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select
+                label="Jurusan / Peminatan"
+                value={selectedJurusanId}
+                onChange={(e) => handleJurusanChange(e.target.value)}
+                options={
+                  jurusanList.length > 0
+                    ? jurusanList.map((j) => ({
+                        label: `${j.nama} (${j.kode})`,
+                        value: j.id,
+                      }))
+                    : [{ label: '-- Belum ada data jurusan --', value: '' }]
+                }
+                required
+              />
 
+              <Select
+                label="Rombongan Belajar (Rombel)"
+                value={selectedKelasId}
+                onChange={(e) => setSelectedKelasId(e.target.value)}
+                options={
+                  availableKelasForJurusan.length > 0
+                    ? availableKelasForJurusan.map((k) => ({
+                        label: k.nama_lengkap || `Kelas ${k.tingkat} ${k.jurusan?.kode || ''} ${k.nama_rombel}`,
+                        value: k.id,
+                      }))
+                    : [
+                        {
+                          label: selectedJurusanId
+                            ? '-- Belum ada rombel pada jurusan ini --'
+                            : '-- Pilih jurusan terlebih dahulu --',
+                          value: '',
+                        },
+                      ]
+                }
+                disabled={!selectedJurusanId || availableKelasForJurusan.length === 0}
+                required
+              />
+            </div>
+
+            {selectedKelasObj && (
+              <p className="text-[11px] text-foreground-muted pt-0.5">
+                Kelas terpilih:{' '}
+                <strong className="text-foreground">
+                  {selectedKelasObj.nama_lengkap || `Kelas ${selectedKelasObj.tingkat} ${selectedKelasObj.nama_rombel}`}
+                </strong>
+                <span className="text-foreground-muted ml-1">
+                  (Tingkat {selectedKelasObj.tingkat}, Jurusan {selectedKelasObj.jurusan?.nama || selectedKelasObj.jurusan?.kode})
+                </span>
+              </p>
+            )}
+          </div>
+
+          {/* Periode Tahun Ajaran */}
           <Select
             label="Periode Tahun Ajaran"
             value={selectedTahunId}
             onChange={(e) => setSelectedTahunId(e.target.value)}
-            options={(Array.isArray(tahunAjaranList) ? tahunAjaranList : []).map((t) => ({
-              label: `${t?.nama ?? ''} (${t?.semester ?? ''}) - ${t?.status ?? ''}`,
-              value: t?.id ?? '',
-            }))}
+            options={
+              tahunAjaranList.length > 0
+                ? tahunAjaranList.map((t) => ({
+                    label: `${t.nama} (${t.semester}) ${t.status === 'AKTIF' ? '• AKTIF' : ''}`,
+                    value: t.id,
+                  }))
+                : [{ label: '-- Belum ada tahun ajaran --', value: '' }]
+            }
+            required
           />
 
           <div className="flex justify-end gap-2 pt-3">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsWaliModalOpen(false)}
+              onClick={() => {
+                setIsWaliModalOpen(false);
+                setSelectedGuru(null);
+              }}
               disabled={assignWaliMutation.isPending}
             >
               Batal
@@ -709,8 +880,9 @@ export default function AdminPenggunaPage() {
               type="submit"
               variant="primary"
               isLoading={assignWaliMutation.isPending}
+              disabled={!selectedGuruId || !selectedKelasId || !selectedTahunId}
             >
-              Tugaskan Sekarang
+              Simpan Penugasan
             </Button>
           </div>
         </form>

@@ -33,6 +33,11 @@ export interface Jurusan {
   sekolah_id: string;
   nama: string;
   kode: string;
+  total_kelas?: number;
+  total_jadwal?: number;
+  has_active_jadwal?: boolean;
+  can_edit?: boolean;
+  can_delete?: boolean;
 }
 
 export interface Kelas {
@@ -43,6 +48,10 @@ export interface Kelas {
   nama_rombel: string;
   nama_lengkap?: string;
   jurusan?: Jurusan;
+  total_jadwal?: number;
+  has_active_jadwal?: boolean;
+  can_edit?: boolean;
+  can_delete?: boolean;
 }
 
 export interface MataPelajaran {
@@ -50,6 +59,10 @@ export interface MataPelajaran {
   sekolah_id: string;
   nama: string;
   kode: string;
+  total_jadwal?: number;
+  has_active_jadwal?: boolean;
+  can_edit?: boolean;
+  can_delete?: boolean;
 }
 
 export interface UserProfile {
@@ -420,5 +433,59 @@ export interface DetailRaportSiswaResponse {
   kehadiran: RekapKehadiranRaport;
   catatan_wali_kelas: string | null;
 }
+
+export type RumpunMapelPilihan = 'MIPA' | 'IPS' | 'BAHASA' | 'VOKASI' | 'UMUM';
+
+export interface PilihanMapelOption {
+  id: string;
+  nama: string;
+  kode: string;
+  rumpun: RumpunMapelPilihan;
+  totalJp: number;
+  blokSesi: number[];
+  deskripsi?: string;
+}
+
+export interface StudentKrsChoice {
+  id: string;
+  mapel_id: string;
+  mapel_nama: string;
+  mapel_kode: string;
+  status: 'DRAFT' | 'FIKS';
+  rumpun: RumpunMapelPilihan;
+  totalJp: number;
+}
+
+export interface StudentKrsItem {
+  siswa_id: string;
+  nama: string;
+  nisn: string;
+  kelas_id: string;
+  kelas_nama: string;
+  tingkat: number;
+  status_krs: 'BELUM_MEMILIH' | 'DRAFT' | 'FIKS';
+  total_pilihan: number;
+  pilihan_mapel: StudentKrsChoice[];
+}
+
+export interface PilihanMapelSummary {
+  tahun_ajaran_id: string;
+  total_siswa_fase_f: number;
+  metrics: {
+    sudah_fiks: number;
+    masih_draft: number;
+    belum_memilih: number;
+    persentase_siap: number;
+    is_ready_for_generation: boolean;
+  };
+  distribution_per_mapel: Array<{
+    id: string;
+    nama: string;
+    kode: string;
+    count: number;
+    rumpun: string;
+  }>;
+}
+
 
 

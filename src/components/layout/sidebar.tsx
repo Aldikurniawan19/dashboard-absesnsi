@@ -17,6 +17,7 @@ import {
   FileText,
   GraduationCap,
   History,
+  Layers,
   LayoutDashboard,
   QrCode,
   Settings,
@@ -46,6 +47,164 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// Menu Admin dikelompokkan berdasarkan fungsi
+const adminGroups: NavGroup[] = [
+  {
+    title: 'Utama',
+    items: [
+      { href: '/', label: 'Ringkasan Sekolah', icon: <LayoutDashboard className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: 'Data Akademik',
+    items: [
+      { href: '/admin/tahun-ajaran', label: 'Tahun Ajaran', icon: <Clock className="w-4 h-4" /> },
+      { href: '/admin/master-data', label: 'Jurusan, Kelas & Mapel', icon: <BookOpen className="w-4 h-4" /> },
+      {
+        href: '/admin/jadwal',
+        label: 'Manajemen Jadwal',
+        icon: <Calendar className="w-4 h-4" />,
+        children: [
+          {
+            href: '/admin/jadwal',
+            label: 'Jadwal Pelajaran',
+            icon: <BookOpen className="w-3.5 h-3.5" />,
+          },
+          {
+            href: '/admin/jadwal/pilihan-mapel',
+            label: 'Mapel Pilihan (KRS)',
+            icon: <Layers className="w-3.5 h-3.5" />,
+          },
+          {
+            href: '/admin/jadwal/ujian',
+            label: 'Jadwal Ujian',
+            icon: <GraduationCap className="w-3.5 h-3.5" />,
+          },
+        ],
+      },
+      {
+        href: '/admin/penilaian',
+        label: 'Kurikulum Merdeka',
+        icon: <Award className="w-4 h-4" />,
+        children: [
+          {
+            href: '/admin/penilaian/konfigurasi',
+            label: 'Bobot & Predikat',
+            icon: <Sliders className="w-3.5 h-3.5" />,
+          },
+          {
+            href: '/admin/penilaian/ekstrakurikuler',
+            label: 'Master Ekskul',
+            icon: <Award className="w-3.5 h-3.5" />,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Pengguna',
+    items: [
+      { href: '/admin/pengguna', label: 'Manajemen Pengguna', icon: <Users className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: 'Presensi & Laporan',
+    items: [
+      { href: '/wali-kelas/persetujuan-izin', label: 'Persetujuan Izin Siswa', icon: <FileCheck2 className="w-4 h-4" /> },
+      { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: 'Sistem & Pengaturan',
+    items: [
+      { href: '/admin/sekolah', label: 'Konfigurasi Sekolah', icon: <Settings className="w-4 h-4" /> },
+      { href: '/admin/audit-log', label: 'Log Aktivitas Sistem', icon: <History className="w-4 h-4" /> },
+    ],
+  },
+];
+
+// Menu Guru Mapel
+const guruGroups: NavGroup[] = [
+  {
+    title: 'Utama',
+    items: [
+      { href: '/', label: 'Ringkasan', icon: <LayoutDashboard className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: 'KBM & Presensi',
+    items: [
+      { href: '/guru/jadwal', label: 'Jadwal Mengajar & Sesi', icon: <Calendar className="w-4 h-4" /> },
+      { href: '/guru/absensi-manual', label: 'Absensi Manual', icon: <UserCheck className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: 'Penilaian Kurikulum Merdeka',
+    items: [
+      { href: '/guru/nilai', label: 'Input Nilai Siswa', icon: <Award className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: 'Laporan',
+    items: [
+      { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
+      { href: '/laporan/mapel', label: 'Laporan Mata Pelajaran', icon: <BookOpen className="w-4 h-4" /> },
+    ],
+  },
+];
+
+// Menu Tambahan Wali Kelas
+const waliKelasGroups: NavGroup[] = [
+  {
+    title: 'Perwalian Kelas',
+    items: [
+      { href: '/wali-kelas/persetujuan-izin', label: 'Persetujuan Izin / Sakit', icon: <FileCheck2 className="w-4 h-4" /> },
+      { href: '/wali-kelas/rekap-kelas', label: 'Rekap Kehadiran Kelas', icon: <GraduationCap className="w-4 h-4" /> },
+      { href: '/wali-kelas/nilai', label: 'Rekap Nilai Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
+      { href: '/wali-kelas/raport', label: 'Raport Siswa', icon: <FileText className="w-4 h-4" /> },
+      { href: '/wali-kelas/ekstrakurikuler', label: 'Ekstrakurikuler Siswa', icon: <Award className="w-4 h-4" /> },
+    ],
+  },
+];
+
+const ALL_NAV_GROUPS: NavGroup[] = [...adminGroups, ...guruGroups, ...waliKelasGroups];
+
+/**
+ * Memeriksa apakah rute saat ini cocok dengan menu induk atau salah satu child item-nya
+ */
+function isMenuMatch(currentPath: string, item: NavItem): boolean {
+  if (item.children && item.children.length > 0) {
+    return (
+      item.children.some((child) => {
+        if (child.href === '/admin/jadwal') {
+          return currentPath === '/admin/jadwal' || currentPath === '/admin/jadwal/buat-otomatis';
+        }
+        return currentPath === child.href || currentPath.startsWith(child.href + '/');
+      }) ||
+      currentPath === item.href ||
+      currentPath.startsWith(item.href + '/')
+    );
+  }
+  return currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href + '/'));
+}
+
+/**
+ * Mengambil status awal submenu:
+ * Hanya bernilai true jika user saat ini sedang membuka rute di dalam menu tersebut.
+ * Ketika pertama kali membuka dan tidak sedang di menu tersebut, semua submenu tertutup (false).
+ */
+function getInitialSubmenusState(currentPath: string): Record<string, boolean> {
+  const state: Record<string, boolean> = {};
+  for (const group of ALL_NAV_GROUPS) {
+    for (const item of group.items) {
+      if (item.children && item.children.length > 0) {
+        state[item.href] = isMenuMatch(currentPath, item);
+      }
+    }
+  }
+  return state;
+}
+
 interface SidebarContentProps {
   onClose?: () => void;
   isCollapsed?: boolean;
@@ -54,22 +213,19 @@ interface SidebarContentProps {
 function SidebarContent({ onClose, isCollapsed = false }: SidebarContentProps) {
   const pathname = usePathname();
   const { user, isGuru, isAdmin, isWaliKelas } = useAuth();
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
-    '/admin/jadwal': true,
-    '/admin/penilaian': true,
-  });
+
+  // Inisialisasi state submenu:
+  // Tertutup secara default jika rute saat ini tidak berada di dalam menu tersebut
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>(() =>
+    getInitialSubmenusState(pathname),
+  );
 
   // State menu mengambang (flyout popover) yang aktif saat diklik pada mode collapsed
   const [activeFlyoutMenu, setActiveFlyoutMenu] = useState<string | null>(null);
 
-  // Otomatis buka submenu jika route saat ini berada di dalamnya pada mode expanded
+  // Otomatis sinkronisasi submenu saat rute berpindah halaman
   useEffect(() => {
-    if (pathname.startsWith('/admin/jadwal')) {
-      setOpenSubmenus((prev) => ({ ...prev, '/admin/jadwal': true }));
-    }
-    if (pathname.startsWith('/admin/penilaian')) {
-      setOpenSubmenus((prev) => ({ ...prev, '/admin/penilaian': true }));
-    }
+    setOpenSubmenus(getInitialSubmenusState(pathname));
     // Tutup flyout saat berpindah halaman
     setActiveFlyoutMenu(null);
   }, [pathname]);
@@ -111,127 +267,15 @@ function SidebarContent({ onClose, isCollapsed = false }: SidebarContentProps) {
       setActiveFlyoutMenu((prev) => (prev === key ? null : key));
     } else {
       // Pada mode expanded, toggle accordion submenu
-      setOpenSubmenus((prev) => ({
-        ...prev,
-        [key]: !prev[key],
-      }));
+      setOpenSubmenus((prev) => {
+        const isCurrentlyOpen = prev[key] ?? false;
+        return {
+          ...prev,
+          [key]: !isCurrentlyOpen,
+        };
+      });
     }
   };
-
-  // Menu Admin dikelompokkan berdasarkan fungsi
-  const adminGroups: NavGroup[] = [
-    {
-      title: 'Utama',
-      items: [
-        { href: '/', label: 'Ringkasan Sekolah', icon: <LayoutDashboard className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Data Akademik',
-      items: [
-        { href: '/admin/tahun-ajaran', label: 'Tahun Ajaran', icon: <Clock className="w-4 h-4" /> },
-        { href: '/admin/master-data', label: 'Jurusan, Kelas & Mapel', icon: <BookOpen className="w-4 h-4" /> },
-        {
-          href: '/admin/jadwal',
-          label: 'Manajemen Jadwal',
-          icon: <Calendar className="w-4 h-4" />,
-          children: [
-            {
-              href: '/admin/jadwal',
-              label: 'Jadwal Pelajaran',
-              icon: <BookOpen className="w-3.5 h-3.5" />,
-            },
-            {
-              href: '/admin/jadwal/ujian',
-              label: 'Jadwal Ujian',
-              icon: <GraduationCap className="w-3.5 h-3.5" />,
-            },
-          ],
-        },
-        {
-          href: '/admin/penilaian',
-          label: 'Kurikulum Merdeka',
-          icon: <Award className="w-4 h-4" />,
-          children: [
-            {
-              href: '/admin/penilaian/konfigurasi',
-              label: 'Bobot & Predikat',
-              icon: <Sliders className="w-3.5 h-3.5" />,
-            },
-            {
-              href: '/admin/penilaian/ekstrakurikuler',
-              label: 'Master Ekskul',
-              icon: <Award className="w-3.5 h-3.5" />,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Pengguna',
-      items: [
-        { href: '/admin/pengguna', label: 'Manajemen Pengguna', icon: <Users className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Presensi & Laporan',
-      items: [
-        { href: '/wali-kelas/persetujuan-izin', label: 'Persetujuan Izin Siswa', icon: <FileCheck2 className="w-4 h-4" /> },
-        { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Sistem & Pengaturan',
-      items: [
-        { href: '/admin/sekolah', label: 'Konfigurasi Sekolah', icon: <Settings className="w-4 h-4" /> },
-        { href: '/admin/audit-log', label: 'Log Aktivitas Sistem', icon: <History className="w-4 h-4" /> },
-      ],
-    },
-  ];
-
-  // Menu Guru Mapel
-  const guruGroups: NavGroup[] = [
-    {
-      title: 'Utama',
-      items: [
-        { href: '/', label: 'Ringkasan', icon: <LayoutDashboard className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'KBM & Presensi',
-      items: [
-        { href: '/guru/jadwal', label: 'Jadwal Mengajar & Sesi', icon: <Calendar className="w-4 h-4" /> },
-        { href: '/guru/absensi-manual', label: 'Absensi Manual', icon: <UserCheck className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Penilaian Kurikulum Merdeka',
-      items: [
-        { href: '/guru/nilai', label: 'Input Nilai Siswa', icon: <Award className="w-4 h-4" /> },
-      ],
-    },
-    {
-      title: 'Laporan',
-      items: [
-        { href: '/laporan/kelas', label: 'Laporan Kehadiran Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
-        { href: '/laporan/mapel', label: 'Laporan Mata Pelajaran', icon: <BookOpen className="w-4 h-4" /> },
-      ],
-    },
-  ];
-
-  // Menu Tambahan Wali Kelas
-  const waliKelasGroups: NavGroup[] = [
-    {
-      title: 'Perwalian Kelas',
-      items: [
-        { href: '/wali-kelas/persetujuan-izin', label: 'Persetujuan Izin / Sakit', icon: <FileCheck2 className="w-4 h-4" /> },
-        { href: '/wali-kelas/rekap-kelas', label: 'Rekap Kehadiran Kelas', icon: <GraduationCap className="w-4 h-4" /> },
-        { href: '/wali-kelas/nilai', label: 'Rekap Nilai Kelas', icon: <FileSpreadsheet className="w-4 h-4" /> },
-        { href: '/wali-kelas/raport', label: 'Raport Siswa', icon: <FileText className="w-4 h-4" /> },
-        { href: '/wali-kelas/ekstrakurikuler', label: 'Ekstrakurikuler Siswa', icon: <Award className="w-4 h-4" /> },
-      ],
-    },
-  ];
 
   const handleLinkClick = () => {
     setActiveFlyoutMenu(null);
@@ -256,7 +300,7 @@ function SidebarContent({ onClose, isCollapsed = false }: SidebarContentProps) {
       <nav className="space-y-1">
         {group.items.map((item) => {
           if (item.children && item.children.length > 0) {
-            const isParentActive = pathname.startsWith(item.href);
+            const isParentActive = isMenuMatch(pathname, item);
             const isFlyoutOpen = activeFlyoutMenu === item.href;
             const isOpen = openSubmenus[item.href] ?? isParentActive;
 
@@ -349,6 +393,7 @@ function SidebarContent({ onClose, isCollapsed = false }: SidebarContentProps) {
                 <button
                   type="button"
                   onClick={() => toggleSubmenu(item.href)}
+                  aria-expanded={isOpen}
                   className={cn(
                     'group flex w-full items-center justify-between px-3 py-2 text-xs font-medium rounded-md transition-colors',
                     isParentActive

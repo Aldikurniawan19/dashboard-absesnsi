@@ -157,6 +157,11 @@ export default function AdminJadwalPage() {
     waktu: string;
   } | null>(null);
 
+  // State Modal Hapus Semua Jadwal
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
+  const [deleteAllScope, setDeleteAllScope] = useState<'kelas' | 'semua'>('kelas');
+  const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
+
   // Feedback Error & Success
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -498,12 +503,34 @@ export default function AdminJadwalPage() {
     },
   });
 
-  // Mutasi Hapus Jadwal
+  // Mutasi Hapus Jadwal Tunggal
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => api.delete(`/jadwal/${id}`),
     onSuccess: () => {
       refetchAllSchedules();
       toast.success('Jadwal berhasil dihapus');
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menghapus jadwal', err?.response?.data?.message || 'Terjadi kesalahan sistem');
+    },
+  });
+
+  // Mutasi Hapus Semua Jadwal
+  const deleteAllJadwalMutation = useMutation({
+    mutationFn: async ({ tahunAjaranId, kelasId }: { tahunAjaranId: string; kelasId?: string }) => {
+      const queryParams = new URLSearchParams();
+      queryParams.append('tahun_ajaran_id', tahunAjaranId);
+      if (kelasId) {
+        queryParams.append('kelas_id', kelasId);
+      }
+      const res = await api.delete(`/jadwal/semua?${queryParams.toString()}`);
+      return res.data;
+    },
+    onSuccess: (res: any) => {
+      refetchAllSchedules();
+      setIsDeleteAllModalOpen(false);
+      setIsDeleteConfirmed(false);
+      toast.success('Jadwal pelajaran berhasil dihapus', res?.message || 'Semua jadwal berhasil dibersihkan');
     },
     onError: (err: any) => {
       toast.error('Gagal menghapus jadwal', err?.response?.data?.message || 'Terjadi kesalahan sistem');
@@ -668,6 +695,15 @@ export default function AdminJadwalPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <Button
+              variant="outline"
+              size="md"
+              onClick={() => router.push('/admin/jadwal/pilihan-mapel')}
+              className="gap-2"
+            >
+              <BookOpen className="w-4 h-4 text-primary" />
+              <span>Mapel Pilihan (KRS)</span>
+            </Button>
+            <Button
               variant={examList.some((e: any) => e.is_active) ? 'secondary' : 'outline'}
               size="md"
               onClick={() => router.push('/admin/jadwal/ujian')}
@@ -689,6 +725,20 @@ export default function AdminJadwalPage() {
             >
               <UploadCloud className="w-4 h-4" />
               <span>Impor Jadwal</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => {
+                setDeleteAllScope('kelas');
+                setIsDeleteConfirmed(false);
+                setIsDeleteAllModalOpen(true);
+              }}
+              disabled={allSchedules.length === 0}
+              className="gap-2 text-danger border-danger/30 hover:bg-danger-light hover:border-danger disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hapus Semua Jadwal</span>
             </Button>
             <Button
               variant="primary"
@@ -737,6 +787,9 @@ export default function AdminJadwalPage() {
               label="Pilih Rombongan Belajar / Kelas"
               value={selectedKelasId}
               onChange={(e) => setSelectedKelasId(e.target.value)}
+              searchable
+              searchPlaceholder="Cari rombel / nama kelas / jurusan..."
+              emptyMessage="Rombongan belajar / kelas tidak ditemukan"
               options={(Array.isArray(kelasList) ? kelasList : []).map((k) => ({
                 label: `${k?.nama_lengkap || `Kelas ${k?.tingkat ?? ''} ${k?.nama_rombel ?? ''}`} — Jurusan ${k?.jurusan?.kode || ''}`,
                 value: k?.id ?? '',
@@ -2126,6 +2179,159 @@ export default function AdminJadwalPage() {
                 <span>Hapus Jadwal Ujian</span>
               </Button>
             )}
+          </div>
+        </div>
+      </Dialog>
+
+      {/* MODAL KONFIRMASI HAPUS SEMUA JADWAL */}
+      <Dialog
+        isOpen={isDeleteAllModalOpen}
+        onClose={() => {
+          setIsDeleteAllModalOpen(false);
+          setIsDeleteConfirmed(false);
+        }}
+        title="Hapus Jadwal Pelajaran"
+        description="Pilih cakupan jadwal yang ingin dihapus secara permanen"
+        maxWidth="md"
+        isLoading={deleteAllJadwalMutation.isPending}
+        loadingMessage="Menghapus jadwal pelajaran..."
+      >
+        <div className="space-y-4 py-1">
+          {/* Warning Banner */}
+          <div className="rounded-lg bg-danger-light border border-danger/30 p-3.5 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs text-danger">
+              <p className="font-semibold">Tindakan ini tidak dapat dibatalkan</p>
+              <p className="opacity-90">
+                Data jadwal pelajaran yang dihapus akan hilang dari sistem dan aplikasi mobile.
+              </p>
+            </div>
+          </div>
+
+          {/* Opsi Pilihan Cakupan Hapus */}
+          <div className="space-y-2.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Pilih Cakupan Penghapusan:
+            </label>
+
+            {/* Opsi 1: Hanya Kelas Ini */}
+            <div
+              onClick={() => {
+                setDeleteAllScope('kelas');
+                setIsDeleteConfirmed(false);
+              }}
+              className={cn(
+                'flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all',
+                deleteAllScope === 'kelas'
+                  ? 'border-primary bg-primary-light/40 shadow-xs'
+                  : 'border-border bg-surface hover:bg-surface-muted',
+              )}
+            >
+              <input
+                type="radio"
+                id="scope-kelas"
+                name="delete-scope"
+                checked={deleteAllScope === 'kelas'}
+                onChange={() => {
+                  setDeleteAllScope('kelas');
+                  setIsDeleteConfirmed(false);
+                }}
+                className="mt-0.5 text-primary focus:ring-primary"
+              />
+              <div className="space-y-0.5 text-xs">
+                <label htmlFor="scope-kelas" className="font-semibold text-foreground cursor-pointer block">
+                  Hanya Kelas Terpilih ({selectedKelas?.nama_lengkap || 'Kelas Ini'})
+                </label>
+                <p className="text-foreground-muted">
+                  Menghapus {currentClassSchedules.length} sesi jadwal pelajaran khusus untuk kelas ini pada tahun ajaran aktif.
+                </p>
+              </div>
+            </div>
+
+            {/* Opsi 2: Seluruh Sekolah / Semua Kelas */}
+            <div
+              onClick={() => {
+                setDeleteAllScope('semua');
+                setIsDeleteConfirmed(false);
+              }}
+              className={cn(
+                'flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all',
+                deleteAllScope === 'semua'
+                  ? 'border-danger bg-danger-light/30 shadow-xs'
+                  : 'border-border bg-surface hover:bg-surface-muted',
+              )}
+            >
+              <input
+                type="radio"
+                id="scope-semua"
+                name="delete-scope"
+                checked={deleteAllScope === 'semua'}
+                onChange={() => {
+                  setDeleteAllScope('semua');
+                  setIsDeleteConfirmed(false);
+                }}
+                className="mt-0.5 text-danger focus:ring-danger"
+              />
+              <div className="space-y-0.5 text-xs">
+                <label htmlFor="scope-semua" className="font-semibold text-danger cursor-pointer block">
+                  Semua Kelas di Sekolah (Seluruh Rombel)
+                </label>
+                <p className="text-foreground-muted">
+                  Menghapus total {allSchedules.length} sesi jadwal pelajaran dari seluruh kelas pada periode tahun ajaran ini.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Konfirmasi Centang Persetujuan */}
+          <div className="pt-2 border-t border-border/50">
+            <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border/70 bg-surface-muted hover:bg-surface cursor-pointer select-none transition-colors">
+              <input
+                type="checkbox"
+                id="confirm-delete-checkbox"
+                checked={isDeleteConfirmed}
+                onChange={(e) => setIsDeleteConfirmed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border text-danger focus:ring-danger focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="text-xs text-foreground font-medium leading-tight">
+                Saya mengerti risiko ini dan benar-benar mengonfirmasi untuk menghapus seluruh data jadwal yang dipilih secara permanen.
+              </span>
+            </label>
+          </div>
+
+          {/* Tombol Aksi */}
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-border/50">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsDeleteAllModalOpen(false);
+                setIsDeleteConfirmed(false);
+              }}
+              disabled={deleteAllJadwalMutation.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              isLoading={deleteAllJadwalMutation.isPending}
+              disabled={!isDeleteConfirmed || deleteAllJadwalMutation.isPending}
+              onClick={() => {
+                deleteAllJadwalMutation.mutate({
+                  tahunAjaranId: selectedTahunId,
+                  kelasId: deleteAllScope === 'kelas' ? selectedKelasId : undefined,
+                });
+              }}
+              className="gap-1.5"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>
+                {deleteAllScope === 'kelas'
+                  ? `Hapus ${currentClassSchedules.length} Jadwal Kelas`
+                  : `Hapus Semua (${allSchedules.length} Jadwal)`}
+              </span>
+            </Button>
           </div>
         </div>
       </Dialog>
